@@ -1,0 +1,74 @@
+# List of database connections available to the application.
+# Each key is a unique identifier for the connection.
+databases:
+  postgres_docker:
+    name: "Postgres (Docker)"
+    engine: "postgresql"
+    # host: "postgres" # Docker service name
+    host: "localhost"
+    port: 5432
+    user: "postgres"
+    password: "mlp123"
+    dbname: "sampledb"
+    allow_mutations: true # Set to true for admin testing
+
+  mongo_docker:
+    name: "MongoDB (Docker)"
+    engine: "mongodb"
+    # The connection string for the Docker setup
+    connection_string: "mongodb://admin:password@mongo:27017/"
+    allow_mutations: true # Set to true for admin testing
+
+  redis_docker:
+    name: "Redis (Docker)"
+    engine: "redis"
+    host: "redis" # Docker service name
+    port: 6379
+    db: 0
+    allow_mutations: true
+
+  # --- Examples for other databases (uncomment and configure if needed) ---
+  #
+  # mysql_local:
+  #   name: "MySQL (Local)"
+  #   engine: "mysql"
+  #   host: "localhost"
+  #   port: 3306
+  #   user: "root"
+  #   password: "your_mysql_password"
+  #   dbname: "testdb"
+  #   allow_mutations: false
+  #
+  # elastic_local:
+  #   name: "Elasticsearch (Local)"
+  #   engine: "elasticsearch"
+  #   host: "localhost"
+  #   port: 9200
+  #   # Optional: Add user/pass if you have security enabled
+  #   # user: "elastic"
+  #   # password: "changeme"
+  #   allow_mutations: false
+  #
+  # bq_analytics:
+  #   name: "BigQuery (Analytics)"
+  #   engine: "bigquery"
+  #   gcp_project_id: "your-gcp-project-id"
+  #   # The path to your service account JSON file.
+  #   # Ensure this file is available inside the Docker container (e.g., via a volume mount).
+  #   credentials_path: "/app/config/gcp-credentials.json"
+  #   allow_mutations: false
+
+# LLM provider configuration
+llm:
+  default_provider: "gemini" # Can be 'gemini' or 'chatgpt'
+  providers:
+    gemini:
+      model: "gemini-1.5-flash" # A fast and capable model
+    chatgpt:
+      model: "gpt-4-turbo"
+
+# Metadata database for audit logs and saved queries
+metadata_db:
+  engine: "sqlite"
+  # The path is relative to the backend root directory
+  path: "db/audit.db"
