@@ -8,6 +8,7 @@ from services.security import get_current_user
 
 router = APIRouter()
 
+
 @router.get("/config", response_model=AppConfig)
 async def get_app_config():
     """
@@ -18,6 +19,7 @@ async def get_app_config():
         return manager.get_app_config()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/schema/{db_id}", response_model=List[Schema])
 async def get_database_schema(db_id: str):
@@ -33,6 +35,7 @@ async def get_database_schema(db_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve schema: {e}")
 
+
 @router.get("/sample_data/{db_id}/{object_name}", response_model=Dict[str, Any])
 async def get_sample_data(db_id: str, object_name: str):
     """
@@ -45,4 +48,6 @@ async def get_sample_data(db_id: str, object_name: str):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve sample data: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve sample data: {e}"
+        )

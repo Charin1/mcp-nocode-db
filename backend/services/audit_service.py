@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Optional
 
+
 class AuditLogEntry(BaseModel):
     id: int
     timestamp: str
@@ -16,6 +17,7 @@ class AuditLogEntry(BaseModel):
     error: Optional[str] = None
     rows_returned: Optional[int] = None
 
+
 class AuditService:
     _db_path = None
     _initialized = False
@@ -24,18 +26,19 @@ class AuditService:
     def initialize(cls):
         if cls._initialized:
             return
-        
+
         with open("config/config.yaml", "r") as f:
             config = yaml.safe_load(f)
-        
+
         cls._db_path = config["metadata_db"]["path"]
-        
+
         try:
             conn = sqlite3.connect(cls._db_path)
             cursor = conn.cursor()
-            
+
             # Create audit_logs table
-            cursor.execute("""
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
@@ -48,10 +51,12 @@ class AuditService:
                 error TEXT,
                 rows_returned INTEGER
             )
-            """)
-            
+            """
+            )
+
             # Create saved_queries table
-            cursor.execute("""
+            cursor.execute(
+                """
             CREATE TABLE IF NOT EXISTS saved_queries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL,
@@ -61,7 +66,8 @@ class AuditService:
                 raw_query TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
-            """)
+            """
+            )
 
             conn.commit()
             conn.close()
@@ -79,12 +85,12 @@ class AuditService:
 
         conn = sqlite3.connect(cls._db_path)
         cursor = conn.cursor()
-        
+
         query = """
         INSERT INTO audit_logs (timestamp, username, db_id, natural_query, generated_query, executed, success, error, rows_returned)
         VALUES (:timestamp, :username, :db_id, :natural_query, :generated_query, :executed, :success, :error, :rows_returned)
         """
-        
+
         params = {
             "timestamp": datetime.utcnow().isoformat(),
             "username": kwargs.get("username"),
@@ -94,9 +100,9 @@ class AuditService:
             "executed": kwargs.get("executed"),
             "success": kwargs.get("success"),
             "error": kwargs.get("error"),
-            "rows_returned": kwargs.get("rows_returned")
+            "rows_returned": kwargs.get("rows_returned"),
         }
-        
+
         cursor.execute(query, params)
         conn.commit()
         conn.close()
@@ -105,13 +111,15 @@ class AuditService:
     def get_logs(cls, limit: int = 100) -> List[AuditLogEntry]:
         if not cls._initialized:
             return []
-            
+
         conn = sqlite3.connect(cls._db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,))
+
+        cursor.execute(
+            "SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,)
+        )
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [AuditLogEntry(**row) for row in rows]
