@@ -6,22 +6,25 @@ import json
 
 from models.query import GeneratedQuery
 
+
 class LLMService:
     def __init__(self):
         with open("config/config.yaml", "r") as f:
             self.config = yaml.safe_load(f)["llm"]
-        
+
         # Configure Google Gemini
         google_api_key = os.getenv("GOOGLE_API_KEY")
         if google_api_key:
             genai.configure(api_key=google_api_key)
-        
+
         # Configure OpenAI
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    async def generate_query(self, provider: str, natural_language_query: str, schema: str, engine: str) -> GeneratedQuery:
+    async def generate_query(
+        self, provider: str, natural_language_query: str, schema: str, engine: str
+    ) -> GeneratedQuery:
         prompt = self._build_prompt(natural_language_query, schema, engine)
-        
+
         if provider.lower() == "gemini":
             return await self._generate_with_gemini(prompt, engine)
         elif provider.lower() == "chatgpt":
@@ -94,18 +97,25 @@ class LLMService:
             else:
                 # Handle cases where the response might be blocked or empty
                 return GeneratedQuery(
-                    raw_query="", 
-                    error="Error from Gemini API: Received an empty or blocked response.", 
-                    query_type=engine
+                    raw_query="",
+                    error="Error from Gemini API: Received an empty or blocked response.",
+                    query_type=engine,
                 )
-            
+
             # Clean the extracted text
-            cleaned_text = raw_text.strip().replace("```sql", "").replace("```json", "").replace("```", "")
+            cleaned_text = (
+                raw_text.strip()
+                .replace("```sql", "")
+                .replace("```json", "")
+                .replace("```", "")
+            )
             return self._parse_llm_response(cleaned_text, engine)
-            
+
         except Exception as e:
             # Catch other potential exceptions during the API call
-            return GeneratedQuery(raw_query="", error=f"Error from Gemini API: {e}", query_type=engine)
+            return GeneratedQuery(
+                raw_query="", error=f"Error from Gemini API: {e}", query_type=engine
+            )
 
     async def _generate_with_chatgpt(self, prompt: str, engine: str) -> GeneratedQuery:
         try:
@@ -113,65 +123,72 @@ class LLMService:
             response = self.openai_client.chat.completions.create(
                 model=model_name,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that converts natural language to database queries."},
-                    {"role": "user", "content": prompt}
-                ]
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that converts natural language to database queries.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             raw_text = response.choices.message.content.strip()
             return self._parse_llm_response(raw_text, engine)
         except Exception as e:
-            return GeneratedQuery(raw_query="", error=f"Error from OpenAI API: {e}", query_type=engine)
+            return GeneratedQuery(
+                raw_query="", error=f"Error from OpenAI API: {e}", query_type=engine
+            )
 
     def _parse_llm_response(self, text: str, engine: str) -> GeneratedQuery:
         if engine in ["postgresql", "mysql", "sqlite"]:
             if "----JSON----" in text:
                 # Split the text into two parts at the separator
                 parts = text.split("----JSON----", 1)
-                
+
                 # Check if we got two parts as expected
                 if len(parts) == 2:
-                    sql_part = parts[0].strip() # Get the first element and strip it
-                    json_part = parts[1].strip() # Get the second element and strip it
-                    
+                    sql_part = parts[0].strip()  # Get the first element and strip it
+                    json_part = parts[1].strip()  # Get the second element and strip it
+
                     try:
                         # The JSON part might be empty if there are no parameters
                         params = json.loads(json_part) if json_part else None
-                        return GeneratedQuery(raw_query=sql_part, params=params, query_type="sql")
+                        return GeneratedQuery(
+                            raw_query=sql_part, params=params, query_type="sql"
+                        )
                     except json.JSONDecodeError:
                         # The model generated malformed JSON
                         return GeneratedQuery(
-                            raw_query=sql_part, # Still return the SQL part
-                            error="LLM returned invalid JSON for parameters.", 
-                            query_type="sql"
+                            raw_query=sql_part,  # Still return the SQL part
+                            error="LLM returned invalid JSON for parameters.",
+                            query_type="sql",
                         )
                 else:
                     # This case is unlikely but good to handle
                     return GeneratedQuery(
-                        raw_query=text, 
-                        error="LLM output contained separator but could not be split correctly.", 
-                        query_type="sql"
+                        raw_query=text,
+                        error="LLM output contained separator but could not be split correctly.",
+                        query_type="sql",
                     )
             else:
                 # Fallback if the model didn't follow instructions at all
                 return GeneratedQuery(
-                    raw_query=text, 
-                    error="LLM did not return the expected SQL----JSON---- format.", 
-                    query_type="sql"
+                    raw_query=text,
+                    error="LLM did not return the expected SQL----JSON---- format.",
+                    query_type="sql",
                 )
-        
+
         elif engine == "mongodb":
             try:
                 # The entire response should be the JSON object
                 # We just validate it here. The raw text is the query itself.
-                json.loads(text) 
+                json.loads(text)
                 return GeneratedQuery(raw_query=text, query_type="mongo_json")
             except json.JSONDecodeError:
                 return GeneratedQuery(
-                    raw_query=text, 
-                    error="LLM did not return a valid JSON object for the MongoDB query.", 
-                    query_type="mongo_json"
+                    raw_query=text,
+                    error="LLM did not return a valid JSON object for the MongoDB query.",
+                    query_type="mongo_json",
                 )
-        
+
         else:
             # For other engines, return the text as is
             return GeneratedQuery(raw_query=text, query_type=engine)

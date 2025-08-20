@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
+
 class BaseConnector(ABC):
     """Abstract Base Class for all database connectors."""
-    
+
     def __init__(self, db_config: Dict[str, Any]):
         self.db_config = db_config
         self.engine = db_config.get("engine")
@@ -25,7 +26,7 @@ class BaseConnector(ABC):
         e.g., list of tables for SQL, collections for MongoDB.
         """
         pass
-    
+
     @abstractmethod
     async def get_schema_for_prompt(self) -> str:
         """

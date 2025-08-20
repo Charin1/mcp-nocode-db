@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from fastapi import FastAPI, Depends
@@ -10,7 +11,6 @@ from routers import auth, database, query, admin
 from services.audit_service import AuditService
 from services.security import get_current_user, has_role, create_initial_admin_user
 
-# Load environment variables from .env file at the very start
 
 app = FastAPI(
     title="MCP No-Code DB Tool",
@@ -18,7 +18,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS Middleware Setup - Allows the frontend to communicate with the backend
+# Allows the frontend to communicate with the backend
 origins = [
     "http://localhost:5173",  # Default Vite dev server port
     "http://localhost:3000",  # Default Create React App port
@@ -32,16 +32,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize services on startup
+
 @app.on_event("startup")
 async def startup_event():
     """Initializes services and creates the first admin user if none exist."""
     AuditService.initialize()
     create_initial_admin_user()
-    print("--- Application startup complete. Audit service initialized. ---")
 
 
-# Include all the modular routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(
     database.router,

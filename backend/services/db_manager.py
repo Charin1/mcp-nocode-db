@@ -10,6 +10,7 @@ from services.connectors.elasticsearch_connector import ElasticsearchConnector
 from services.connectors.bigquery_connector import BigQueryConnector
 from models.database import AppConfig, DBConnection
 
+
 class DbManager:
     _instance = None
     _connectors: Dict[str, BaseConnector] = {}
@@ -42,7 +43,9 @@ class DbManager:
             elif engine == "bigquery":
                 self._connectors[db_id] = BigQueryConnector(db_info)
             else:
-                print(f"Warning: Unsupported database engine '{engine}' for db_id '{db_id}'.")
+                print(
+                    f"Warning: Unsupported database engine '{engine}' for db_id '{db_id}'."
+                )
 
     def get_connector(self, db_id: str) -> BaseConnector:
         connector = self._connectors.get(db_id)
@@ -58,12 +61,12 @@ class DbManager:
                     id=db_id,
                     name=db_info.get("name"),
                     engine=db_info.get("engine"),
-                    allow_mutations=db_info.get("allow_mutations", False)
+                    allow_mutations=db_info.get("allow_mutations", False),
                 )
             )
-        
+
         llm_providers = list(self.config.get("llm", {}).get("providers", {}).keys())
-        
+
         return AppConfig(databases=db_connections, llm_providers=llm_providers)
 
     def get_db_config(self, db_id: str) -> Dict[str, Any]:

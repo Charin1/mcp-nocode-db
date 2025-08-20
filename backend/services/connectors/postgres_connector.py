@@ -5,8 +5,9 @@ import re
 
 from .base_connector import BaseConnector
 
+
 class PostgresConnector(BaseConnector):
-    
+
     def __init__(self, db_config: Dict[str, Any]):
         super().__init__(db_config)
         self.conn = None
@@ -31,27 +32,39 @@ class PostgresConnector(BaseConnector):
         try:
             with self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 # Get tables and views
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT table_name, table_type 
                     FROM information_schema.tables 
                     WHERE table_schema = 'public'
                     ORDER BY table_name;
-                """)
+                """
+                )
                 tables = cur.fetchall()
                 for table in tables:
                     # Get columns for each table
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT column_name, data_type 
                         FROM information_schema.columns 
                         WHERE table_name = %s AND table_schema = 'public'
                         ORDER BY ordinal_position;
-                    """, (table['table_name'],))
+                    """,
+                        (table["table_name"],),
+                    )
                     columns = cur.fetchall()
-                    schema_data.append({
-                        "name": table['table_name'],
-                        "type": "view" if table['table_type'] == 'VIEW' else "table",
-                        "columns": [{"name": col['column_name'], "type": col['data_type']} for col in columns]
-                    })
+                    schema_data.append(
+                        {
+                            "name": table["table_name"],
+                            "type": (
+                                "view" if table["table_type"] == "VIEW" else "table"
+                            ),
+                            "columns": [
+                                {"name": col["column_name"], "type": col["data_type"]}
+                                for col in columns
+                            ],
+                        }
+                    )
         finally:
             await self.disconnect()
         return schema_data
@@ -60,7 +73,9 @@ class PostgresConnector(BaseConnector):
         schema_list = await self.get_schema()
         prompt_str = ""
         for table in schema_list:
-            columns_str = ", ".join([f"{col['name']} ({col['type']})" for col in table['columns']])
+            columns_str = ", ".join(
+                [f"{col['name']} ({col['type']})" for col in table["columns"]]
+            )
             prompt_str += f"Table {table['name']}: {columns_str}\n"
         return prompt_str.strip()
 
@@ -70,18 +85,23 @@ class PostgresConnector(BaseConnector):
             with self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 # Use psycopg2's safe identifier composition
                 from psycopg2 import sql
-                query = sql.SQL("SELECT * FROM {table} LIMIT 10").format(table=sql.Identifier(table_name))
+
+                query = sql.SQL("SELECT * FROM {table} LIMIT 10").format(
+                    table=sql.Identifier(table_name)
+                )
                 cur.execute(query)
-                
+
                 columns = [desc for desc in cur.description]
                 rows = [dict(row) for row in cur.fetchall()]
                 return {"columns": columns, "rows": rows}
         finally:
             await self.disconnect()
 
-    async def execute_query(self, query: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def execute_query(
+        self, query: str, params: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         await self.connect()
-        
+
         if params:
             for key in params:
                 query = query.replace(f":{key}", f"%({key})s")
@@ -89,16 +109,23 @@ class PostgresConnector(BaseConnector):
         try:
             with self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(query, params)
-                
+
                 if cur.description:
                     columns = [desc.name for desc in cur.description]
-                    
+
                     rows = [dict(row) for row in cur.fetchall()]
                     self.conn.commit()
-                    return {"columns": columns, "rows": rows, "rows_affected": len(rows)}
+                    return {
+                        "columns": columns,
+                        "rows": rows,
+                        "rows_affected": len(rows),
+                    }
                 else:
                     self.conn.commit()
-                    return {"rows_affected": cur.rowcount, "message": "Query executed successfully."}
+                    return {
+                        "rows_affected": cur.rowcount,
+                        "message": "Query executed successfully.",
+                    }
         except Exception as e:
             self.conn.rollback()
             raise RuntimeError(f"Query execution failed: {e}")
@@ -108,5 +135,15 @@ class PostgresConnector(BaseConnector):
     def is_mutation(self, query: str) -> bool:
         # A simple but effective check for common mutation keywords at the start of a query
         query_normalized = query.strip().upper()
-        mutation_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE"]
-        return any(query_normalized.startswith(keyword) for keyword in mutation_keywords)
+        mutation_keywords = [
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "DROP",
+            "CREATE",
+            "ALTER",
+            "TRUNCATE",
+        ]
+        return any(
+            query_normalized.startswith(keyword) for keyword in mutation_keywords
+        )
