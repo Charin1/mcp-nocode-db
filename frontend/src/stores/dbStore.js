@@ -20,7 +20,9 @@ export const useDbStore = create((set, get) => ({
       const { databases, llm_providers } = response.data;
       set({ databases, llmProviders: llm_providers });
       if (databases.length > 0 && !get().selectedDbId) {
-        set({ selectedDbId: databases[0].id });
+        const initialDbId = databases[0].id;
+        set({ selectedDbId: initialDbId });
+        get().fetchSchema(initialDbId); // Fetch schema for the default DB
       }
       if (llm_providers.length > 0) {
         set({ selectedLlmProvider: llm_providers[0] });
@@ -37,15 +39,15 @@ export const useDbStore = create((set, get) => ({
 
   setSelectedLlmProvider: (provider) => set({ selectedLlmProvider: provider }),
 
-  fetchSchema: async () => {
-    const dbId = get().selectedDbId;
-    if (!dbId) return;
+  fetchSchema: async (dbId = null) => {
+    const finalDbId = dbId || get().selectedDbId;
+    if (!finalDbId) return;
     set({ isLoadingSchema: true, schema: [] });
     try {
-      const response = await apiClient.get(`/api/schema/${dbId}`);
+      const response = await apiClient.get(`/api/schema/${finalDbId}`);
       set({ schema: response.data });
     } catch (error) {
-      toast.error(`Failed to fetch schema for ${dbId}.`);
+      toast.error(`Failed to fetch schema for ${finalDbId}.`);
     } finally {
       set({ isLoadingSchema: false });
     }

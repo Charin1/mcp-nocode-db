@@ -95,7 +95,7 @@ const ChatbotPage = () => {
         setIsLoading(true);
 
         try {
-            const res = await apiClient.post('/chatbot/message', {
+        const res = await apiClient.post('/api/chatbot/message', {
             db_id: selectedDbId,
                 model_provider: llmProvider,
                 messages: newMessages,
