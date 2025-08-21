@@ -3,31 +3,49 @@ import google.generativeai as genai
 from openai import OpenAI
 import yaml
 import json
+from typing import List
 
-from models.query import GeneratedQuery
+from models.query import GeneratedQuery, ChatMessage
+
 
 class LLMService:
     def __init__(self):
         with open("config/config.yaml", "r") as f:
             self.config = yaml.safe_load(f)["llm"]
-        
+
         # Configure Google Gemini
         google_api_key = os.getenv("GOOGLE_API_KEY")
         if google_api_key:
             genai.configure(api_key=google_api_key)
-        
+
         # Configure OpenAI
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    async def generate_query(self, provider: str, natural_language_query: str, schema: str, engine: str) -> GeneratedQuery:
+    async def generate_query(
+        self, provider: str, natural_language_query: str, schema: str, engine: str
+    ) -> GeneratedQuery:
         prompt = self._build_prompt(natural_language_query, schema, engine)
-        
+
         if provider.lower() == "gemini":
             return await self._generate_with_gemini(prompt, engine)
         elif provider.lower() == "chatgpt":
             return await self._generate_with_chatgpt(prompt, engine)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
+
+    async def generate_response_from_messages(
+        self, provider: str, messages: List[ChatMessage], schema: str, engine: str
+    ) -> ChatMessage:
+        prompt = self._build_chat_prompt(messages, schema, engine)
+
+        if provider.lower() == "gemini":
+            raw_response = await self._generate_chat_with_gemini(prompt)
+        elif provider.lower() == "chatgpt":
+            raw_response = await self._generate_chat_with_chatgpt(prompt)
+        else:
+            raise ValueError(f"Unsupported LLM provider: {provider}")
+
+        return self._parse_chat_response(raw_response)
 
     def _build_prompt(self, nl_query: str, schema: str, engine: str) -> str:
         # This is a critical part. The quality of the prompt determines the quality of the output.
@@ -79,6 +97,34 @@ class LLMService:
                 "{nl_query}"
                 """
 
+    def _build_chat_prompt(
+        self, messages: List[ChatMessage], schema: str, engine: str
+    ) -> str:
+        # Format the conversation history
+        history = "\n".join([f"{m.role}: {m.content}" for m in messages])
+
+        # Create a dynamic prompt for the chatbot
+        return f"""
+            You are a helpful and friendly database assistant chatbot.
+            Your goal is to help the user explore a database by answering their questions.
+            You can either have a conversation or, if the user asks for specific data,
+            you can generate a SQL query for a {engine} database.
+
+            ### Instructions
+            1.  If the user is asking a question that requires data, generate a **read-only SQL SELECT query**.
+            2.  When you generate a query, **ONLY return the SQL query inside a ```sql ... ``` block.** Do not include any other text in your response.
+            3.  If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
+            4.  Use the provided conversation history for context.
+
+            ### Database Schema
+            {schema}
+
+            ### Conversation History
+            {history}
+
+            ### Your Response
+            """
+
     async def _generate_with_gemini(self, prompt: str, engine: str) -> GeneratedQuery:
         try:
             model_name = self.config["providers"]["gemini"]["model"]
@@ -94,18 +140,25 @@ class LLMService:
             else:
                 # Handle cases where the response might be blocked or empty
                 return GeneratedQuery(
-                    raw_query="", 
-                    error="Error from Gemini API: Received an empty or blocked response.", 
-                    query_type=engine
+                    raw_query="",
+                    error="Error from Gemini API: Received an empty or blocked response.",
+                    query_type=engine,
                 )
-            
+
             # Clean the extracted text
-            cleaned_text = raw_text.strip().replace("```sql", "").replace("```json", "").replace("```", "")
+            cleaned_text = (
+                raw_text.strip()
+                .replace("```sql", "")
+                .replace("```json", "")
+                .replace("```", "")
+            )
             return self._parse_llm_response(cleaned_text, engine)
-            
+
         except Exception as e:
             # Catch other potential exceptions during the API call
-            return GeneratedQuery(raw_query="", error=f"Error from Gemini API: {e}", query_type=engine)
+            return GeneratedQuery(
+                raw_query="", error=f"Error from Gemini API: {e}", query_type=engine
+            )
 
     async def _generate_with_chatgpt(self, prompt: str, engine: str) -> GeneratedQuery:
         try:
@@ -113,65 +166,116 @@ class LLMService:
             response = self.openai_client.chat.completions.create(
                 model=model_name,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that converts natural language to database queries."},
-                    {"role": "user", "content": prompt}
-                ]
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that converts natural language to database queries.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             raw_text = response.choices.message.content.strip()
             return self._parse_llm_response(raw_text, engine)
         except Exception as e:
-            return GeneratedQuery(raw_query="", error=f"Error from OpenAI API: {e}", query_type=engine)
+            return GeneratedQuery(
+                raw_query="", error=f"Error from OpenAI API: {e}", query_type=engine
+            )
 
     def _parse_llm_response(self, text: str, engine: str) -> GeneratedQuery:
         if engine in ["postgresql", "mysql", "sqlite"]:
             if "----JSON----" in text:
                 # Split the text into two parts at the separator
                 parts = text.split("----JSON----", 1)
-                
+
                 # Check if we got two parts as expected
                 if len(parts) == 2:
-                    sql_part = parts[0].strip() # Get the first element and strip it
-                    json_part = parts[1].strip() # Get the second element and strip it
-                    
+                    sql_part = parts[0].strip()  # Get the first element and strip it
+                    json_part = parts[1].strip()  # Get the second element and strip it
+
                     try:
                         # The JSON part might be empty if there are no parameters
                         params = json.loads(json_part) if json_part else None
-                        return GeneratedQuery(raw_query=sql_part, params=params, query_type="sql")
+                        return GeneratedQuery(
+                            raw_query=sql_part, params=params, query_type="sql"
+                        )
                     except json.JSONDecodeError:
                         # The model generated malformed JSON
                         return GeneratedQuery(
-                            raw_query=sql_part, # Still return the SQL part
-                            error="LLM returned invalid JSON for parameters.", 
-                            query_type="sql"
+                            raw_query=sql_part,  # Still return the SQL part
+                            error="LLM returned invalid JSON for parameters.",
+                            query_type="sql",
                         )
                 else:
                     # This case is unlikely but good to handle
                     return GeneratedQuery(
-                        raw_query=text, 
-                        error="LLM output contained separator but could not be split correctly.", 
-                        query_type="sql"
+                        raw_query=text,
+                        error="LLM output contained separator but could not be split correctly.",
+                        query_type="sql",
                     )
             else:
                 # Fallback if the model didn't follow instructions at all
                 return GeneratedQuery(
-                    raw_query=text, 
-                    error="LLM did not return the expected SQL----JSON---- format.", 
-                    query_type="sql"
+                    raw_query=text,
+                    error="LLM did not return the expected SQL----JSON---- format.",
+                    query_type="sql",
                 )
-        
+
         elif engine == "mongodb":
             try:
                 # The entire response should be the JSON object
                 # We just validate it here. The raw text is the query itself.
-                json.loads(text) 
+                json.loads(text)
                 return GeneratedQuery(raw_query=text, query_type="mongo_json")
             except json.JSONDecodeError:
                 return GeneratedQuery(
-                    raw_query=text, 
-                    error="LLM did not return a valid JSON object for the MongoDB query.", 
-                    query_type="mongo_json"
+                    raw_query=text,
+                    error="LLM did not return a valid JSON object for the MongoDB query.",
+                    query_type="mongo_json",
                 )
-        
+
         else:
             # For other engines, return the text as is
             return GeneratedQuery(raw_query=text, query_type=engine)
+
+    async def _generate_chat_with_gemini(self, prompt: str) -> str:
+        try:
+            model_name = self.config["providers"]["gemini"]["model"]
+            model = genai.GenerativeModel(model_name)
+            response = await model.generate_content_async(prompt)
+
+            if response.candidates and response.candidates[0].content.parts:
+                return response.candidates[0].content.parts[0].text
+            else:
+                return "Error from Gemini API: Received an empty or blocked response."
+        except Exception as e:
+            return f"Error from Gemini API: {e}"
+
+    async def _generate_chat_with_chatgpt(self, prompt: str) -> str:
+        try:
+            model_name = self.config["providers"]["chatgpt"]["model"]
+            response = self.openai_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that converts natural language to database queries.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            return f"Error from OpenAI API: {e}"
+
+    def _parse_chat_response(self, text: str) -> ChatMessage:
+        # Check if the response contains a SQL query
+        if "```sql" in text:
+            start = text.find("```sql") + len("```sql")
+            end = text.find("```", start)
+            query = text[start:end].strip()
+            return ChatMessage(
+                role="assistant",
+                content="I have generated a query for you. Please review and confirm if you would like to execute it.",
+                query=query,
+            )
+        else:
+            return ChatMessage(role="assistant", content=text)

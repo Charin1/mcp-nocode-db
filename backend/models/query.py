@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
+
 
 class QueryRequest(BaseModel):
     db_id: str
@@ -9,13 +10,15 @@ class QueryRequest(BaseModel):
     # Flags from UI
     preview_only: bool = True
     confirm_execute: bool = False
-    allow_mutations: bool = False # This must be explicitly passed from the UI
+    allow_mutations: bool = False  # This must be explicitly passed from the UI
+
 
 class GeneratedQuery(BaseModel):
     raw_query: str
-    params: Optional[Dict[str, Any]] = None # For parameterized SQL
-    query_type: str # 'sql', 'mongo_json', 'redis_cli', etc.
+    params: Optional[Dict[str, Any]] = None  # For parameterized SQL
+    query_type: str  # 'sql', 'mongo_json', 'redis_cli', etc.
     error: Optional[str] = None
+
 
 class QueryResult(BaseModel):
     columns: Optional[List[str]] = None
@@ -25,6 +28,7 @@ class QueryResult(BaseModel):
     rows_affected: Optional[int] = None
     query_executed: str
 
+
 class SavedQuery(BaseModel):
     id: Optional[int] = None
     username: str
@@ -32,3 +36,18 @@ class SavedQuery(BaseModel):
     name: str
     natural_language_query: Optional[str] = None
     raw_query: str
+
+
+# --- Chatbot Models ---
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    query: Optional[str] = None  # For when the assistant returns a query for confirmation
+
+
+class ChatRequest(BaseModel):
+    db_id: str
+    model_provider: str
+    messages: List[ChatMessage]
