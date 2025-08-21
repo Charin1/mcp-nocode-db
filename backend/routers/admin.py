@@ -4,6 +4,7 @@ from services.audit_service import AuditService, AuditLogEntry
 
 router = APIRouter()
 
+
 @router.get("/audit", response_model=List[AuditLogEntry])
 async def get_audit_logs(limit: int = 100):
     """

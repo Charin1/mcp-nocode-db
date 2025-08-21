@@ -8,10 +8,10 @@ from services.audit_service import AuditService
 
 router = APIRouter()
 
+
 @router.post("/query/generate", response_model=GeneratedQuery)
 async def generate_query_from_nl(
-    request: QueryRequest,
-    current_user: User = Depends(get_current_user)
+    request: QueryRequest, current_user: User = Depends(get_current_user)
 ):
     """
     Takes a natural language query and returns a generated raw query (SQL, Mongo JSON, etc.)
@@ -21,26 +21,23 @@ async def generate_query_from_nl(
     llm_service = LLMService()
 
     try:
-        # Get schema to provide context to the LLM
         schema_for_prompt = await db_manager.get_schema_for_prompt(request.db_id)
         db_engine = db_manager.get_db_engine(request.db_id)
 
-        # Generate the query using the LLM service
         generated_query = await llm_service.generate_query(
             provider=request.model_provider,
             natural_language_query=request.natural_language_query,
             schema=schema_for_prompt,
-            engine=db_engine
+            engine=db_engine,
         )
 
-        # Log the generation event
         AuditService.log(
             username=current_user.username,
             db_id=request.db_id,
             natural_query=request.natural_language_query,
             generated_query=generated_query.raw_query,
             executed=False,
-            success=True if not generated_query.error else False
+            success=True if not generated_query.error else False,
         )
 
         return generated_query
@@ -54,38 +51,45 @@ async def generate_query_from_nl(
             natural_query=request.natural_language_query,
             executed=False,
             success=False,
-            error=str(e)
+            error=str(e),
         )
         raise HTTPException(status_code=500, detail=f"Failed to generate query: {e}")
 
 
 @router.post("/query/execute", response_model=QueryResult)
 async def execute_raw_query(
-    request: QueryRequest,
-    current_user: User = Depends(get_current_user)
+    request: QueryRequest, current_user: User = Depends(get_current_user)
 ):
     """
     Executes a raw query against the specified database.
     Includes safety checks for mutations.
     """
     db_manager = DbManager()
-    
-    # --- SECURITY CHECK ---
-    # Check if the database config allows mutations at all
+
     db_config = db_manager.get_db_config(request.db_id)
     if not db_config:
-        raise HTTPException(status_code=404, detail=f"Database '{request.db_id}' not found.")
+        raise HTTPException(
+            status_code=404, detail=f"Database '{request.db_id}' not found."
+        )
 
     is_mutation = db_manager.is_mutation_query(request.db_id, request.raw_query)
 
     if is_mutation:
-        # If it's a mutation, check if the DB allows it AND the user is an admin AND they confirmed it
         if not db_config.get("allow_mutations"):
-            raise HTTPException(status_code=403, detail="Mutations are disabled for this database connection in the configuration.")
+            raise HTTPException(
+                status_code=403,
+                detail="Mutations are disabled for this database connection in the configuration.",
+            )
         if current_user.role != "admin":
-            raise HTTPException(status_code=403, detail="Forbidden: Only admins can perform mutation queries.")
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: Only admins can perform mutation queries.",
+            )
         if not request.allow_mutations:
-            raise HTTPException(status_code=400, detail="Mutation query detected, but the 'allow_mutations' confirmation flag was not set.")
+            raise HTTPException(
+                status_code=400,
+                detail="Mutation query detected, but the 'allow_mutations' confirmation flag was not set.",
+            )
 
     try:
         result = await db_manager.execute_query(request.db_id, request.raw_query)
@@ -97,7 +101,7 @@ async def execute_raw_query(
             generated_query=request.raw_query,
             executed=True,
             success=True,
-            rows_returned=result.get("rows_affected", 0)
+            rows_returned=result.get("rows_affected", 0),
         )
         return QueryResult(**result, query_executed=request.raw_query)
 
@@ -109,6 +113,6 @@ async def execute_raw_query(
             generated_query=request.raw_query,
             executed=True,
             success=False,
-            error=str(e)
+            error=str(e),
         )
         return QueryResult(error=str(e), query_executed=request.raw_query)
