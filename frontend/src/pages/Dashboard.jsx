@@ -7,7 +7,6 @@ import { useEffect } from 'react';
 const Dashboard = () => {
   const fetchAppConfig = useDbStore(state => state.fetchAppConfig);
 
-  // Fetch the initial config when the dashboard loads
   useEffect(() => {
     fetchAppConfig();
   }, [fetchAppConfig]);

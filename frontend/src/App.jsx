@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from 'context/AuthContext'; // Corrected import
+import { AuthProvider, useAuth } from 'context/AuthContext';
 import Dashboard from 'pages/Dashboard';
 import Login from 'pages/Login';
 import { ToastContainer } from 'react-toastify';
