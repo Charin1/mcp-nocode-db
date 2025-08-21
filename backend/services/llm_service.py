@@ -36,12 +36,12 @@ class LLMService:
     async def generate_response_from_messages(
         self, provider: str, messages: List[ChatMessage], schema: str, engine: str
     ) -> ChatMessage:
-        prompt = self._build_chat_prompt(messages, schema, engine)
-
         if provider.lower() == "gemini":
+            prompt = self._build_chat_prompt(messages, schema, engine)
             raw_response = await self._generate_chat_with_gemini(prompt)
         elif provider.lower() == "chatgpt":
-            raw_response = await self._generate_chat_with_chatgpt(prompt)
+            system_prompt = self._build_chat_system_prompt(schema, engine)
+            raw_response = await self._generate_chat_with_chatgpt(system_prompt, messages)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
@@ -123,6 +123,23 @@ class LLMService:
             {history}
 
             ### Your Response
+            """
+
+    def _build_chat_system_prompt(self, schema: str, engine: str) -> str:
+        return f"""
+            You are a helpful and friendly database assistant chatbot.
+            Your goal is to help the user explore a database by answering their questions.
+            You can either have a conversation or, if the user asks for specific data,
+            you can generate a SQL query for a {engine} database.
+
+            ### Instructions
+            1.  If the user is asking a question that requires data, generate a **read-only SQL SELECT query**.
+            2.  When you generate a query, **ONLY return the SQL query inside a ```sql ... ``` block.** Do not include any other text in your response.
+            3.  If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
+            4.  Use the provided conversation history for context.
+
+            ### Database Schema
+            {schema}
             """
 
     async def _generate_with_gemini(self, prompt: str, engine: str) -> GeneratedQuery:
@@ -249,22 +266,27 @@ class LLMService:
         except Exception as e:
             return f"Error from Gemini API: {e}"
 
-    async def _generate_chat_with_chatgpt(self, prompt: str) -> str:
+    async def _generate_chat_with_chatgpt(
+        self, system_prompt: str, messages: List[ChatMessage]
+    ) -> str:
         try:
             model_name = self.config["providers"]["chatgpt"]["model"]
+
+            # Convert our ChatMessage model to the dict format OpenAI expects
+            formatted_messages = [m.dict() for m in messages]
+
             response = self.openai_client.chat.completions.create(
                 model=model_name,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that converts natural language to database queries.",
-                    },
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": system_prompt},
+                    *formatted_messages,
                 ],
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            return f"Error from OpenAI API: {e}"
+            # Log the full error for debugging
+            print(f"Error calling OpenAI: {e}")
+            return "Sorry, I encountered an error trying to generate a response."
 
     def _parse_chat_response(self, text: str) -> ChatMessage:
         # Check if the response contains a SQL query
