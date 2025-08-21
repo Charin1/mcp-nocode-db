@@ -95,10 +95,17 @@ const ChatbotPage = () => {
         setIsLoading(true);
 
         try {
+        // Sanitize messages to only include fields expected by the backend
+        const payloadMessages = newMessages.map(({ role, content, query }) => ({
+            role,
+            content,
+            query: query || null,
+        }));
+
         const res = await apiClient.post('/api/chatbot/message', {
             db_id: selectedDbId,
                 model_provider: llmProvider,
-                messages: newMessages,
+            messages: payloadMessages,
             });
 
             setMessages([...newMessages, res.data]);
