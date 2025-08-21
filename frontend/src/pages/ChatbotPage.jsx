@@ -111,8 +111,12 @@ const ChatbotPage = () => {
             setMessages([...newMessages, res.data]);
 
         } catch (error) {
-            const errorMsg = error.response?.data?.detail || 'An unexpected error occurred.';
-            setMessages([...newMessages, { role: 'assistant', content: `Error: ${errorMsg}` }]);
+        let errorMsg = 'An unexpected error occurred.';
+        if (error.response?.data?.detail) {
+            // Stringify the detail object to make it readable
+            errorMsg = `Error: ${JSON.stringify(error.response.data.detail, null, 2)}`;
+        }
+        setMessages([...newMessages, { role: 'assistant', content: errorMsg }]);
         } finally {
             setIsLoading(false);
         }
