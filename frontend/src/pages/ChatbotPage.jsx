@@ -74,8 +74,8 @@ const ChatbotPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isContextLimitReached, setIsContextLimitReached] = useState(false);
 
-    const { selectedDb, llmProvider } = useDbStore(state => ({
-        selectedDb: state.selectedDb,
+  const { selectedDbId, llmProvider } = useDbStore(state => ({
+    selectedDbId: state.selectedDbId,
         llmProvider: state.llmProvider,
     }));
 
@@ -87,7 +87,7 @@ const ChatbotPage = () => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!userInput.trim() || !selectedDb || isContextLimitReached) return;
+    if (!userInput.trim() || !selectedDbId) return;
 
         const newMessages = [...messages, { role: 'user', content: userInput }];
         setMessages(newMessages);
@@ -96,7 +96,7 @@ const ChatbotPage = () => {
 
         try {
             const res = await apiClient.post('/chatbot/message', {
-                db_id: selectedDb,
+            db_id: selectedDbId,
                 model_provider: llmProvider,
                 messages: newMessages,
             });
@@ -115,7 +115,7 @@ const ChatbotPage = () => {
         setIsLoading(true);
         try {
             const res = await apiClient.post('/query/execute', {
-                db_id: selectedDb,
+            db_id: selectedDbId,
                 raw_query: query,
             });
             const resultMessage = {
@@ -183,17 +183,17 @@ const ChatbotPage = () => {
                     placeholder={
                         isContextLimitReached
                             ? "Please start a new conversation."
-                            : selectedDb
+                            : selectedDbId
                             ? "Ask a question about your data..."
                             : "Please select a database first."
                     }
                     className="flex-1 p-2 rounded-l-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={!selectedDb || isLoading || isContextLimitReached}
+                    disabled={!selectedDbId || isLoading || isContextLimitReached}
                 />
                 <button
                     type="submit"
                     className="px-4 py-2 rounded-r-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500"
-                    disabled={!selectedDb || isLoading || isContextLimitReached || !userInput.trim()}
+                    disabled={!selectedDbId || isLoading || isContextLimitReached || !userInput.trim()}
                 >
                     {isLoading ? '...' : 'Send'}
                 </button>
