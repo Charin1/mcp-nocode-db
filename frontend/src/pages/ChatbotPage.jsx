@@ -125,7 +125,7 @@ const ChatbotPage = () => {
     const handleExecuteQuery = async (query) => {
         setIsLoading(true);
         try {
-            const res = await apiClient.post('/query/execute', {
+        const res = await apiClient.post('/api/query/execute', {
             db_id: selectedDbId,
                 raw_query: query,
             });
