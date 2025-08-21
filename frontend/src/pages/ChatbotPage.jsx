@@ -76,7 +76,7 @@ const ChatbotPage = () => {
 
   const { selectedDbId, llmProvider } = useDbStore(state => ({
     selectedDbId: state.selectedDbId,
-        llmProvider: state.llmProvider,
+    llmProvider: state.selectedLlmProvider,
     }));
 
     useEffect(() => {
