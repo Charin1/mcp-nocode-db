@@ -136,8 +136,11 @@ const ChatbotPage = () => {
             };
             setMessages([...messages, resultMessage]);
         } catch (error) {
-            const errorMsg = error.response?.data?.detail || 'An unexpected error occurred.';
-            setMessages([...messages, { role: 'assistant', content: `Error executing query: ${errorMsg}` }]);
+        let errorMsg = 'An unexpected error occurred while executing the query.';
+        if (error.response?.data?.detail) {
+            errorMsg = `Error executing query: ${JSON.stringify(error.response.data.detail, null, 2)}`;
+        }
+        setMessages([...messages, { role: 'assistant', content: errorMsg }]);
         } finally {
             setIsLoading(false);
         }
