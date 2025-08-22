@@ -14,19 +14,19 @@ See the application in action in three simple steps.
 The workflow begins by asking a question about your data in plain English. The UI is designed to be simple and intuitive. After typing your question, you click "Generate Query" to have the AI process your request.
 
 
-![Step 1: Write a Natural Language Query](./docs/images/step1.png)
+![Step 1: Write a Natural Language Query](./docs/images/chatbot_step1.png)
 
 ### Step 2: Review the AI-Generated SQL
 The application uses the selected LLM to translate your question into a precise SQL query. The UI automatically switches to the "Raw Query" tab, displaying the generated SQL for your review and approval. This ensures you have full control and can verify the query before it runs.
 
 
-![Step 2: Review the Generated SQL](./docs/images/step2.png)
+![Step 2: Review the Generated SQL](./docs/images/chatbot_step2.png)
 
 ### Step 3: Execute and View the Results
 With the generated query confirmed, you click "Execute." The backend runs the query against your database, and the results are instantly displayed in a clean, interactive, and paginated table in the results panel below.
 
 
-![Step 3: View the Query Results](./docs/images/step3.png)
+![Step 3: View the Query Results](./docs/images/chatbot_step3.png)
 
 ---
 
