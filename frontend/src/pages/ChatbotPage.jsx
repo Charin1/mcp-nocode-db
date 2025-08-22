@@ -128,6 +128,7 @@ const ChatbotPage = () => {
         const res = await apiClient.post('/api/query/execute', {
             db_id: selectedDbId,
                 raw_query: query,
+            model_provider: llmProvider,
             });
             const resultMessage = {
                 role: 'assistant',

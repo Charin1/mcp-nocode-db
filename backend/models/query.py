@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, List, Literal
 class QueryRequest(BaseModel):
     db_id: str
     model_provider: str
-    natural_language_query: str
+    natural_language_query: Optional[str] = ""
     raw_query: Optional[str] = None
     # Flags from UI
     preview_only: bool = True
