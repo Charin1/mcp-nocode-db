@@ -14,19 +14,40 @@ See the application in action in three simple steps.
 The workflow begins by asking a question about your data in plain English. The UI is designed to be simple and intuitive. After typing your question, you click "Generate Query" to have the AI process your request.
 
 
-![Step 1: Write a Natural Language Query](./docs/images/chatbot_step1.png)
+![Step 1: Write a Natural Language Query](./docs/images/step1.png)
 
 ### Step 2: Review the AI-Generated SQL
 The application uses the selected LLM to translate your question into a precise SQL query. The UI automatically switches to the "Raw Query" tab, displaying the generated SQL for your review and approval. This ensures you have full control and can verify the query before it runs.
 
 
-![Step 2: Review the Generated SQL](./docs/images/chatbot_step2.png)
+![Step 2: Review the Generated SQL](./docs/images/step2.png)
 
 ### Step 3: Execute and View the Results
 With the generated query confirmed, you click "Execute." The backend runs the query against your database, and the results are instantly displayed in a clean, interactive, and paginated table in the results panel below.
 
 
-![Step 3: View the Query Results](./docs/images/chatbot_step3.png)
+![Step 3: View the Query Results](./docs/images/step3.png)
+
+---
+
+## 🤖 How It Works: The Chatbot
+
+For a more interactive experience, the chatbot allows for a continuous conversation about your data.
+
+### Step 1: Start the Conversation
+Switch to the "Chatbot" tab and ask a question in plain English. The chatbot will understand your query in the context of your conversation.
+
+![Step 1: Ask a question in the chat](./docs/images/chatbot_step1.png)
+
+### Step 2: Confirm the Generated Query
+The chatbot will generate the appropriate SQL and ask for your confirmation before running it, ensuring you always have control.
+
+![Step 2: Confirm the generated query](./docs/images/chatbot_step2.png)
+
+### Step 3: View Results and Ask Follow-up Questions
+Results are displayed directly in the chat. You can then ask follow-up questions, and the chatbot will use the conversation history to understand the context.
+
+![Step 3: View results and ask follow-up questions](./docs/images/chatbot_step3.png)
 
 ---
 
@@ -36,6 +57,7 @@ With the generated query confirmed, you click "Execute." The backend runs the qu
 *   **Dual Query Modes:**
     *   **Natural Language Query:** Ask questions in plain English and have an AI generate the SQL query for you.
     *   **Raw Query Editor:** A powerful editor with SQL syntax highlighting for writing and executing queries directly.
+*   **Conversational Chatbot:** An intuitive chat interface to ask questions, get generated queries for confirmation, and see results, all within a continuous conversation.
 *   **AI-Powered:** Integrated with Google Gemini and OpenAI (ChatGPT) to power the natural language-to-SQL functionality.
 *   **Schema Explorer:** Automatically discovers and displays the tables and columns of the connected PostgreSQL database.
 *   **Secure by Default:**
