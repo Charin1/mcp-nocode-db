@@ -23,6 +23,7 @@ async def handle_chat_message(
 
         # We'll need to update the LLM service to handle a list of messages.
         response_message = await llm_service.generate_response_from_messages(
+            db_id=request.db_id,
             provider=request.model_provider,
             messages=request.messages,
             schema=schema,

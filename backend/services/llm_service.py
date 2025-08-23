@@ -9,6 +9,7 @@ from models.query import GeneratedQuery, ChatMessage
 
 
 class LLMService:
+    cache = {}
     def __init__(self):
         with open("config/config.yaml", "r") as f:
             self.config = yaml.safe_load(f)["llm"]
@@ -34,8 +35,16 @@ class LLMService:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
     async def generate_response_from_messages(
-        self, provider: str, messages: List[ChatMessage], schema: str, engine: str
+        self, db_id: str, provider: str, messages: List[ChatMessage], schema: str, engine: str
     ) -> ChatMessage:
+        last_user_message = next((m.content for m in reversed(messages) if m.role == 'user'), None)
+
+        if last_user_message:
+            cache_key = (db_id, last_user_message)
+            if cache_key in self.cache:
+                print(f"Returning cached response for: {cache_key}")
+                return self.cache[cache_key]
+
         if provider.lower() == "gemini":
             prompt = self._build_chat_prompt(messages, schema, engine)
             raw_response = await self._generate_chat_with_gemini(prompt)
@@ -45,7 +54,14 @@ class LLMService:
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
-        return self._parse_chat_response(raw_response)
+        response = self._parse_chat_response(raw_response)
+
+        if last_user_message:
+            cache_key = (db_id, last_user_message)
+            print(f"Caching response for: {cache_key}")
+            self.cache[cache_key] = response
+        
+        return response
 
     def _build_prompt(self, nl_query: str, schema: str, engine: str) -> str:
         # This is a critical part. The quality of the prompt determines the quality of the output.
