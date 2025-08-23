@@ -22,7 +22,7 @@ const MainPanel = () => {
   const [activeView, setActiveView] = useState('editor'); // 'editor' or 'chatbot'
 
   return (
-    <main className="flex flex-col flex-1 p-4 overflow-hidden">
+    <main className="flex flex-col flex-1 p-4 overflow-y-auto">
       {/* View Toggler */}
       <div className="flex mb-4 border-b border-gray-600">
         <button
@@ -48,7 +48,7 @@ const MainPanel = () => {
       </div>
 
       {/* Content Area */}
-      <div className="flex flex-col flex-1 h-full">
+      <div className="flex flex-col flex-1">
         {activeView === 'editor' ? <QueryEditorView /> : <ChatbotPage />}
       </div>
     </main>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiClient from 'api/apiClient';
 import { useDbStore } from 'stores/dbStore';
 import SimpleCodeEditor from 'react-simple-code-editor';
@@ -73,6 +73,7 @@ const ChatbotPage = () => {
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isContextLimitReached, setIsContextLimitReached] = useState(false);
+    const chatContainerRef = useRef(null);
 
   const { selectedDbId, llmProvider } = useDbStore(state => ({
     selectedDbId: state.selectedDbId,
@@ -82,6 +83,13 @@ const ChatbotPage = () => {
     useEffect(() => {
         if (messages.length >= CONTEXT_LIMIT) {
             setIsContextLimitReached(true);
+        }
+    }, [messages]);
+
+    useEffect(() => {
+        // Scroll to the bottom of the chat container
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [messages]);
 
@@ -153,9 +161,9 @@ const ChatbotPage = () => {
     };
 
     return (
-        <div className="flex flex-col h-full p-4 bg-gray-800 text-white">
+        <div className="flex flex-col p-4 bg-gray-800 text-white">
             <h1 className="text-2xl font-bold mb-4">Chatbot</h1>
-            <div className="flex-1 border rounded-lg p-4 bg-gray-900 overflow-y-auto space-y-4">
+            <div ref={chatContainerRef} className="flex-1 border rounded-lg p-4 bg-gray-900 overflow-y-auto space-y-4">
                 {messages.map((msg, index) => (
                     <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div
