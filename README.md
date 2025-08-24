@@ -1,5 +1,9 @@
 # MCP No-Code DB Tool
 
+![status](https://img.shields.io/badge/status-in_development-yellow)
+
+⚠️ This project is under active development and is **not production-ready**.
+
 MCP No-Code DB is a modern, web-based database tool that allows users to connect to their database and interact with it using either natural language or raw queries. It leverages Large Language Models (LLMs) like Google's Gemini to translate plain English questions into executable SQL queries, providing a powerful and intuitive interface for data exploration.
 
 While the platform is designed to be a **M**ulti-**C**onnection **P**latform, the current version is focused on providing a best-in-class experience for **PostgreSQL**.
@@ -166,3 +170,6 @@ This project is a strong foundation. Future improvements could include:
 *   [ ] **Advanced RBAC:** Implement more granular permissions (e.g., access per database, per role).
 *   [ ] **Production Hardening:** Move secrets to a secure vault.
 *   [ ] **Data Visualizations:** Add a simple charting feature to visualize results.
+
+## Status
+This project is still in its early stages. Expect breaking changes.
