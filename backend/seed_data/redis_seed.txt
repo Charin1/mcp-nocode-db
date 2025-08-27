@@ -1,0 +1,26 @@
+# Clear the database to ensure a clean slate
+FLUSHDB
+
+# --- STRING ---
+# A simple key holding a JSON string
+SET system:config:json '{"maintenance_mode": "false", "api_version": "1.2.0"}'
+
+# --- HASH ---
+# Represents a user object with multiple fields
+HSET user:profile:1 username "john.smith" email "john.smith@example.com" role "viewer"
+
+# --- LIST ---
+# Represents a queue of recent log events
+LPUSH log:events "2025-08-15T10:00:00Z - User logged in"
+LPUSH log:events "2025-08-15T10:05:12Z - Query executed"
+LPUSH log:events "2025-08-15T10:05:15Z - Results returned"
+
+# --- SET ---
+# A set of unique users currently online
+SADD online:users "john.smith" "jane.doe"
+
+# --- SORTED SET (ZSET) ---
+# A leaderboard with scores
+ZADD leaderboard:game 1500 "player_one"
+ZADD leaderboard:game 2200 "player_two"
+ZADD leaderboard:game 1850 "player_three"
