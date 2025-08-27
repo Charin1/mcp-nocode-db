@@ -22,7 +22,7 @@ databases:
   redis_docker:
     name: "Redis (Docker)"
     engine: "redis"
-    host: "redis" # Docker service name
+    host: "localhost" # Docker service name
     port: 6379
     db: 0
     allow_mutations: true
