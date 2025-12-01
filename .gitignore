@@ -94,3 +94,5 @@ frontend/.env.local
 
 # research files
 backend/research/
+
+.DS_Store
