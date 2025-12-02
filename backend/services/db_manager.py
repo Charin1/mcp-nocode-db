@@ -3,11 +3,11 @@ from typing import Dict, Any, List
 
 from services.connectors.base_connector import BaseConnector
 from services.connectors.postgres_connector import PostgresConnector
-from services.connectors.mongo_connector import MongoConnector
-from services.connectors.redis_connector import RedisConnector
+# from services.connectors.mongo_connector import MongoConnector
+# from services.connectors.redis_connector import RedisConnector
 from services.connectors.mysql_connector import MySqlConnector
-from services.connectors.elasticsearch_connector import ElasticsearchConnector
-from services.connectors.bigquery_connector import BigQueryConnector
+# from services.connectors.elasticsearch_connector import ElasticsearchConnector
+# from services.connectors.bigquery_connector import BigQueryConnector
 from models.database import AppConfig, DBConnection
 
 
@@ -32,16 +32,16 @@ class DbManager:
             engine = db_info.get("engine")
             if engine == "postgresql":
                 self._connectors[db_id] = PostgresConnector(db_info)
-            elif engine == "mongodb":
-                self._connectors[db_id] = MongoConnector(db_info)
-            elif engine == "redis":
-                self._connectors[db_id] = RedisConnector(db_info)
             elif engine == "mysql":
                 self._connectors[db_id] = MySqlConnector(db_info)
-            elif engine == "elasticsearch":
-                self._connectors[db_id] = ElasticsearchConnector(db_info)
-            elif engine == "bigquery":
-                self._connectors[db_id] = BigQueryConnector(db_info)
+            # elif engine == "mongodb":
+            #     self._connectors[db_id] = MongoConnector(db_info)
+            # elif engine == "redis":
+            #     self._connectors[db_id] = RedisConnector(db_info)
+            # elif engine == "elasticsearch":
+            #     self._connectors[db_id] = ElasticsearchConnector(db_info)
+            # elif engine == "bigquery":
+            #     self._connectors[db_id] = BigQueryConnector(db_info)
             else:
                 print(
                     f"Warning: Unsupported database engine '{engine}' for db_id '{db_id}'."

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from models.auth import User
 from routers import auth, database, query, admin, chatbot
+from mcp_server import mcp
 from services.audit_service import AuditService
 from services.security import get_current_user, has_role, create_initial_admin_user
 
@@ -65,6 +66,7 @@ app.include_router(
     tags=["Chatbot"],
     dependencies=[Depends(get_current_user)],
 )
+app.mount("/api/mcp", mcp.sse_app())
 
 
 @app.get("/health", tags=["Health"])

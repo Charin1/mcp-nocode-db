@@ -63,7 +63,7 @@ llm:
   default_provider: "gemini" # Can be 'gemini' or 'chatgpt'
   providers:
     gemini:
-      model: "gemini-1.5-flash" # A fast and capable model
+      model: "gemini-2.5-flash" # A fast and capable model
     chatgpt:
       model: "gpt-4-turbo"
 

@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
 pydantic==2.11.7
-pydantic_core==2.38.0
 pydantic[email]
 python-dotenv
 pyyaml
@@ -17,7 +16,6 @@ httpx
 click
 h11
 starlette
-
 typing_extensions
 typing_inspection
 annotated_types
@@ -32,19 +30,14 @@ google-cloud
 google-cloud-storage
 google-cloud-pubsub
 google-cloud-bigquery
-google-generativeai
 distro
 httpcore
-passlib==1.7.4
-bcrypt==3.2.2
-pydantic==2.11.7
-pydantic_core==2.39.0
 requests
 elastic_transport
-email-validator  
+email-validator
 google-resumable-media
 google-api-core
 google-cloud-core
 python-dateutil
 packaging
-google-generativeai
+mcp
