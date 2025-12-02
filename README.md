@@ -74,6 +74,27 @@ Results are displayed directly in the chat. You can then ask follow-up questions
 
 ---
 
+## 🔌 MCP Integration
+
+This project implements the **Model Context Protocol (MCP)**, allowing AI assistants (like Claude Desktop or other MCP clients) to directly discover and interact with your database schema and data.
+
+### Available Tools
+
+*   `list_tables(db_id: str)`: Lists all tables in the specified database.
+*   `get_schema(db_id: str)`: Returns the full schema (tables and columns) for the database.
+*   `execute_query(db_id: str, query: str)`: Executes a raw SQL query safely.
+
+### Available Resources
+
+*   `postgres://{db_id}/schema`: Provides the database schema as a formatted text resource.
+
+### Connecting an MCP Client
+
+The MCP server runs over **Server-Sent Events (SSE)**.
+*   **SSE Endpoint:** `http://localhost:8000/api/mcp/sse`
+
+---
+
 ## 💻 Tech Stack
 
 This project is a modern full-stack application built with:
@@ -84,6 +105,7 @@ This project is a modern full-stack application built with:
     *   **Authentication:** **Passlib** and **python-jose**
     *   **Database Driver:** `psycopg2` for PostgreSQL
     *   **AI Integration:** `google-generativeai` and `openai` SDKs
+    *   **MCP:** `mcp` and `fastmcp` for Model Context Protocol integration
 *   **Frontend:**
     *   **Framework:** **React 18** with **Vite**
     *   **Styling:** **TailwindCSS**
