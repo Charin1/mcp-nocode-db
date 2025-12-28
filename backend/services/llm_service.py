@@ -1,6 +1,7 @@
 import os
 import google.generativeai as genai
 from openai import OpenAI
+from groq import AsyncGroq
 import yaml
 import json
 from typing import List
@@ -22,6 +23,9 @@ class LLMService:
         # Configure OpenAI
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+        # Configure Groq
+        self.groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+
     async def generate_query(
         self, provider: str, natural_language_query: str, schema: str, engine: str
     ) -> GeneratedQuery:
@@ -31,6 +35,8 @@ class LLMService:
             return await self._generate_with_gemini(prompt, engine)
         elif provider.lower() == "chatgpt":
             return await self._generate_with_chatgpt(prompt, engine)
+        elif provider.lower() == "groq":
+            return await self._generate_with_groq(prompt, engine)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
@@ -51,6 +57,9 @@ class LLMService:
         elif provider.lower() == "chatgpt":
             system_prompt = self._build_chat_system_prompt(schema, engine)
             raw_response = await self._generate_chat_with_chatgpt(system_prompt, messages)
+        elif provider.lower() == "groq":
+            system_prompt = self._build_chat_system_prompt(schema, engine)
+            raw_response = await self._generate_chat_with_groq(system_prompt, messages)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
@@ -232,6 +241,26 @@ class LLMService:
                 raw_query="", error=f"Error from OpenAI API: {e}", query_type=engine
             )
 
+    async def _generate_with_groq(self, prompt: str, engine: str) -> GeneratedQuery:
+        try:
+            model_name = self.config["providers"]["groq"]["model"]
+            response = await self.groq_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that converts natural language to database queries.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            raw_text = response.choices[0].message.content.strip()
+            return self._parse_llm_response(raw_text, engine)
+        except Exception as e:
+            return GeneratedQuery(
+                raw_query="", error=f"Error from Groq API: {e}", query_type=engine
+            )
+
     def _parse_llm_response(self, text: str, engine: str) -> GeneratedQuery:
         if engine in ["postgresql", "mysql", "sqlite"]:
             if "----JSON----" in text:
@@ -303,6 +332,24 @@ class LLMService:
             return response.choices[0].message.content.strip()
         except Exception as e:
             print(f"Error calling OpenAI: {e}")
+            return "Sorry, I encountered an error trying to generate a response."
+
+    async def _generate_chat_with_groq(
+        self, system_prompt: str, messages: List[ChatMessage]
+    ) -> str:
+        try:
+            model_name = self.config["providers"]["groq"]["model"]
+            formatted_messages = [m.dict() for m in messages]
+            response = await self.groq_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    *formatted_messages,
+                ],
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"Error calling Groq: {e}")
             return "Sorry, I encountered an error trying to generate a response."
 
     def _parse_chat_response(self, text: str, engine: str) -> ChatMessage:

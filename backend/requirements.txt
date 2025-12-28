@@ -12,6 +12,8 @@ pymongo
 redis
 google-generativeai
 openai
+groq
+motor
 httpx
 click
 h11

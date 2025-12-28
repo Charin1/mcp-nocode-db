@@ -18,6 +18,16 @@ class AuditLogEntry(BaseModel):
     rows_returned: Optional[int] = None
 
 
+class SavedQueryEntry(BaseModel):
+    id: int
+    username: str
+    db_id: str
+    name: str
+    natural_language_query: Optional[str] = None
+    raw_query: str
+    created_at: str
+
+
 class AuditService:
     _db_path = None
     _initialized = False
@@ -123,3 +133,46 @@ class AuditService:
         conn.close()
 
         return [AuditLogEntry(**row) for row in rows]
+
+    @classmethod
+    def save_query(cls, username: str, db_id: str, name: str, natural_query: str, raw_query: str):
+        if not cls._initialized:
+            return
+
+        conn = sqlite3.connect(cls._db_path)
+        cursor = conn.cursor()
+
+        query = """
+        INSERT INTO saved_queries (username, db_id, name, natural_language_query, raw_query, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """
+        cursor.execute(query, (username, db_id, name, natural_query, raw_query, datetime.utcnow().isoformat()))
+        conn.commit()
+        conn.close()
+
+    @classmethod
+    def get_saved_queries(cls, username: str) -> List[SavedQueryEntry]:
+        if not cls._initialized:
+            return []
+
+        conn = sqlite3.connect(cls._db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM saved_queries WHERE username = ? ORDER BY created_at DESC", (username,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [SavedQueryEntry(**row) for row in rows]
+
+    @classmethod
+    def delete_saved_query(cls, query_id: int, username: str):
+        if not cls._initialized:
+            return
+
+        conn = sqlite3.connect(cls._db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("DELETE FROM saved_queries WHERE id = ? AND username = ?", (query_id, username))
+        conn.commit()
+        conn.close()
