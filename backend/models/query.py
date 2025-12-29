@@ -45,6 +45,7 @@ class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str
     query: Optional[str] = None  # For when the assistant returns a query for confirmation
+    chart_config: Optional[Dict[str, Any]] = None  # For visualization data
 
 
 class ChatRequest(BaseModel):

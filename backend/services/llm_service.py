@@ -321,7 +321,8 @@ class LLMService:
     ) -> str:
         try:
             model_name = self.config["providers"]["chatgpt"]["model"]
-            formatted_messages = [m.dict() for m in messages]
+            # Sanitize to only include role and content (APIs don't accept extra fields)
+            formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
             response = self.openai_client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -339,7 +340,8 @@ class LLMService:
     ) -> str:
         try:
             model_name = self.config["providers"]["groq"]["model"]
-            formatted_messages = [m.dict() for m in messages]
+            # Sanitize to only include role and content (APIs don't accept extra fields)
+            formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
             response = await self.groq_client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -353,6 +355,8 @@ class LLMService:
             return "Sorry, I encountered an error trying to generate a response."
 
     def _parse_chat_response(self, text: str, engine: str) -> ChatMessage:
+        import re
+        
         if engine in ["postgresql", "mysql", "sqlite"]:
             query_block_tag = "sql"
         elif engine == "redis":
@@ -360,16 +364,53 @@ class LLMService:
         else:
             query_block_tag = "text"
 
-        # Check if the response contains the correct query block
-        if f"```{query_block_tag}" in text:
-            start = text.find(f"```{query_block_tag}") + len(f"```{query_block_tag}")
-            end = text.find("```", start)
-            query = text[start:end].strip()
+        # Try to extract query from code block using regex (handles extra text around block)
+        # Pattern matches ```sql ... ``` or ```redis ... ``` even with surrounding text
+        pattern = rf"```{query_block_tag}\s*([\s\S]*?)```"
+        match = re.search(pattern, text, re.IGNORECASE)
+        
+        if match:
+            query = match.group(1).strip()
             return ChatMessage(
                 role="assistant",
                 content="I have generated a query for you. Please review and confirm if you would like to execute it.",
                 query=query,
             )
-        else:
-            # If no query block is found, return the text as a simple chat message
-            return ChatMessage(role="assistant", content=text)
+        
+        # Fallback: Try generic code block pattern (```...```)
+        generic_pattern = r"```\s*([\s\S]*?)```"
+        generic_match = re.search(generic_pattern, text)
+        
+        if generic_match:
+            potential_query = generic_match.group(1).strip()
+            # Check if it looks like a SQL query (starts with common SQL keywords)
+            sql_keywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "WITH", "CREATE", "ALTER", "DROP", "SHOW", "DESCRIBE"]
+            if any(potential_query.upper().startswith(kw) for kw in sql_keywords):
+                return ChatMessage(
+                    role="assistant",
+                    content="I have generated a query for you. Please review and confirm if you would like to execute it.",
+                    query=potential_query,
+                )
+            # Check if it looks like a Redis command
+            redis_keywords = ["GET", "SET", "HGETALL", "HGET", "HSET", "KEYS", "SCAN", "DEL", "LPUSH", "RPUSH", "LRANGE"]
+            if any(potential_query.upper().startswith(kw) for kw in redis_keywords):
+                return ChatMessage(
+                    role="assistant",
+                    content="I have generated a command for you. Please review and confirm if you would like to execute it.",
+                    query=potential_query,
+                )
+        
+        # Last fallback: Look for SQL-like patterns without code blocks
+        # This handles cases where LLM forgets to use code blocks
+        sql_pattern = r"(?:^|\n)(SELECT\s+[\s\S]*?(?:;|$))"
+        sql_match = re.search(sql_pattern, text, re.IGNORECASE)
+        if sql_match and engine in ["postgresql", "mysql", "sqlite"]:
+            query = sql_match.group(1).strip().rstrip(';') + ';'
+            return ChatMessage(
+                role="assistant",
+                content="I have generated a query for you. Please review and confirm if you would like to execute it.",
+                query=query,
+            )
+        
+        # If no query block is found, return the text as a simple chat message
+        return ChatMessage(role="assistant", content=text)

@@ -52,6 +52,49 @@ async def list_tools() -> List[types.Tool]:
                 },
                 "required": ["db_id", "query"]
             }
+        ),
+        types.Tool(
+            name="generate_chart",
+            description="Generate a chart configuration from query result data. Returns chart type, axis keys, and configuration for visualization.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of column names from query results"
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Array of row objects from query results"
+                    },
+                    "chart_type": {
+                        "type": "string",
+                        "enum": ["bar", "line", "pie", "area", "auto"],
+                        "description": "Preferred chart type, or 'auto' to auto-detect"
+                    }
+                },
+                "required": ["columns", "rows"]
+            }
+        ),
+        types.Tool(
+            name="execute_python",
+            description="Execute Python code for data analysis. Returns the output of the code execution. Use for custom data transformations and calculations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Python code to execute. Code should print output or assign to 'result' variable."
+                    },
+                    "data": {
+                        "type": "object",
+                        "description": "Optional data to pass to the code as 'data' variable"
+                    }
+                },
+                "required": ["code"]
+            }
         )
     ]
 
@@ -85,6 +128,85 @@ async def call_tool(name: str, arguments: Any) -> List[types.TextContent | types
             return [types.TextContent(type="text", text=str(result))]
         except Exception as e:
             return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+    elif name == "generate_chart":
+        from services.visualization_service import VisualizationService
+        columns = arguments.get("columns", [])
+        rows = arguments.get("rows", [])
+        chart_type = arguments.get("chart_type", "auto")
+        
+        try:
+            viz_service = VisualizationService()
+            config = viz_service.analyze_data_for_chart(columns, rows)
+            
+            if config and chart_type != "auto":
+                config["type"] = chart_type
+            
+            import json
+            return [types.TextContent(type="text", text=json.dumps(config, indent=2))]
+        except Exception as e:
+            return [types.TextContent(type="text", text=f"Error generating chart: {str(e)}")]
+
+    elif name == "execute_python":
+        code = arguments.get("code", "")
+        data = arguments.get("data", {})
+        
+        try:
+            import io
+            import sys
+            
+            # Create a restricted execution environment
+            safe_globals = {
+                "__builtins__": {
+                    "print": print,
+                    "len": len,
+                    "range": range,
+                    "sum": sum,
+                    "min": min,
+                    "max": max,
+                    "abs": abs,
+                    "round": round,
+                    "sorted": sorted,
+                    "enumerate": enumerate,
+                    "zip": zip,
+                    "map": map,
+                    "filter": filter,
+                    "list": list,
+                    "dict": dict,
+                    "set": set,
+                    "tuple": tuple,
+                    "str": str,
+                    "int": int,
+                    "float": float,
+                    "bool": bool,
+                    "isinstance": isinstance,
+                    "type": type,
+                }
+            }
+            safe_locals = {"data": data, "result": None}
+            
+            # Capture stdout
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
+            
+            try:
+                exec(code, safe_globals, safe_locals)
+                output = sys.stdout.getvalue()
+                result = safe_locals.get("result")
+                
+                if result is not None:
+                    import json
+                    try:
+                        output += f"\nResult: {json.dumps(result, indent=2)}"
+                    except:
+                        output += f"\nResult: {str(result)}"
+                
+                return [types.TextContent(type="text", text=output if output else "Code executed successfully (no output)")]
+            finally:
+                sys.stdout = old_stdout
+                
+        except Exception as e:
+            return [types.TextContent(type="text", text=f"Execution error: {str(e)}")]
             
     raise ValueError(f"Unknown tool: {name}")
 

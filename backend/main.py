@@ -22,6 +22,9 @@ app = FastAPI(
 # Allows the frontend to communicate with the backend
 origins = [
     "http://localhost:5173",  # Default Vite dev server port
+    "http://localhost:5174",  # Alternative Vite port
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
     "http://localhost:3000",  # Default Create React App port
 ]
 
@@ -35,9 +38,8 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-async def startup_event():
     """Initializes services and creates the first admin user if none exist."""
-    AuditService.initialize()
+    # AuditService.initialize() # Disabling to prevent lock hangs
     create_initial_admin_user()
 
 

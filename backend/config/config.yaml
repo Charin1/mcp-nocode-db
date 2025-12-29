@@ -8,24 +8,24 @@ databases:
     host: "localhost"
     port: 5432
     user: "postgres"
-    password: "password"
+    password: "mlp123"
     dbname: "sampledb"
     allow_mutations: true # Set to true for admin testing
 
-  mongo_docker:
-    name: "MongoDB (Docker)"
-    engine: "mongodb"
-    # The connection string for the Docker setup
-    connection_string: "mongodb://admin:password@mongo:27017/"
-    allow_mutations: true # Set to true for admin testing
+  # mongo_docker:
+  #   name: "MongoDB (Docker)"
+  #   engine: "mongodb"
+  #   # The connection string for the Docker setup
+  #   connection_string: "mongodb://admin:password@mongo:27017/"
+  #   allow_mutations: true # Set to true for admin testing
 
-  redis_docker:
-    name: "Redis (Docker)"
-    engine: "redis"
-    host: "localhost" # Docker service name
-    port: 6379
-    db: 0
-    allow_mutations: true
+  # redis_docker:
+  #   name: "Redis (Docker)"
+  #   engine: "redis"
+  #   host: "localhost" # Docker service name
+  #   port: 6379
+  #   db: 0
+  #   allow_mutations: true
 
   # --- Examples for other databases (uncomment and configure if needed) ---
   #
@@ -60,12 +60,14 @@ databases:
 
 # LLM provider configuration
 llm:
-  default_provider: "gemini" # Can be 'gemini' or 'chatgpt'
+  default_provider: "gemini" # Can be 'gemini', 'chatgpt', or 'groq'
   providers:
     gemini:
       model: "gemini-2.5-flash" # A fast and capable model
     chatgpt:
       model: "gpt-4-turbo"
+    groq:
+      model: "llama-3.3-70b-versatile"
 
 # Metadata database for audit logs and saved queries
 metadata_db:
