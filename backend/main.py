@@ -38,8 +38,9 @@ app.add_middleware(
 
 
 @app.on_event("startup")
+async def startup_event():
     """Initializes services and creates the first admin user if none exist."""
-    # AuditService.initialize() # Disabling to prevent lock hangs
+    # AuditService.initialize()
     create_initial_admin_user()
 
 

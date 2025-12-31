@@ -262,35 +262,59 @@ class LLMService:
             )
 
     def _parse_llm_response(self, text: str, engine: str) -> GeneratedQuery:
+        print(f"DEBUG: Raw LLM Response: {repr(text)}") # Log raw headers/newlines
+
         if engine in ["postgresql", "mysql", "sqlite"]:
-            if "----JSON----" in text:
-                parts = text.split("----JSON----", 1)
-                if len(parts) == 2:
-                    sql_part = parts[0].strip()
-                    json_part = parts[1].strip()
-                    try:
-                        params = json.loads(json_part) if json_part else None
-                        return GeneratedQuery(
-                            raw_query=sql_part, params=params, query_type="sql"
-                        )
-                    except json.JSONDecodeError:
-                        return GeneratedQuery(
-                            raw_query=sql_part,
-                            error="LLM returned invalid JSON for parameters.",
-                            query_type="sql",
-                        )
-                else:
+            # Use regex to find separator flexibly (handling newlines/spaces)
+            import re
+            separator_pattern = r"-+\s*JSON\s*-+"
+            split = re.split(separator_pattern, text, maxsplit=1, flags=re.IGNORECASE)
+            
+            print(f"DEBUG: Regex Split Length: {len(split)}")
+
+            if len(split) == 2:
+                sql_part = split[0].strip()
+                json_part = split[1].strip()
+                
+                print(f"DEBUG: SQL Part: {repr(sql_part)}")
+                print(f"DEBUG: JSON Part: {repr(json_part)}")
+
+                # Remove code blocks if present
+                sql_part = re.sub(r"^```sql\s*", "", sql_part, flags=re.IGNORECASE)
+                sql_part = re.sub(r"```$", "", sql_part).strip()
+                # Clean json part just in case
+                json_part = re.sub(r"^```json\s*", "", json_part, flags=re.IGNORECASE)
+                json_part = re.sub(r"```$", "", json_part).strip()
+                
+                try:
+                    params = json.loads(json_part) if json_part else None
                     return GeneratedQuery(
-                        raw_query=text,
-                        error="LLM output contained separator but could not be split correctly.",
+                        raw_query=sql_part, params=params, query_type="sql"
+                    )
+                except json.JSONDecodeError:
+                    return GeneratedQuery(
+                        raw_query=sql_part,
+                        error="LLM returned invalid JSON for parameters.",
                         query_type="sql",
                     )
             else:
-                return GeneratedQuery(
+                 # Fallback: If no separator, assume entire text is SQL if it looks like SQL
+                 cleaned_text = re.sub(r"^```sql\s*", "", text, flags=re.IGNORECASE)
+                 cleaned_text = re.sub(r"```$", "", cleaned_text).strip()
+                 # If it doesn't have parameters (indicated by :param), we can accept it
+                 if ":" not in cleaned_text: 
+                     return GeneratedQuery(
+                        raw_query=cleaned_text,
+                        params=None, 
+                        query_type="sql"
+                     )
+                     
+                 return GeneratedQuery(
                     raw_query=text,
                     error="LLM did not return the expected SQL----JSON---- format.",
                     query_type="sql",
                 )
+
         elif engine == "mongodb":
             try:
                 json.loads(text)
