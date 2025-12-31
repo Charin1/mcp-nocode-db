@@ -7,7 +7,7 @@
 
 MCP No-Code DB is a modern, web-based database tool that allows users to connect to their database and interact with it using either natural language or raw queries. It leverages Large Language Models (LLMs) like Google's Gemini to translate plain English questions into executable SQL queries, providing a powerful and intuitive interface for data exploration.
 
-While the platform is designed to be a **M**ulti-**C**onnection **P**latform, the current version is focused on providing a best-in-class experience for **PostgreSQL**.
+While the platform is designed to be a **M**ulti-**C**onnection **P**latform, the current version supports **PostgreSQL**, **MongoDB**, and **Redis**.
 
 ---
 
@@ -58,12 +58,13 @@ Results are displayed directly in the chat. You can then ask follow-up questions
 
 ## ✨ Features
 
-*   **Database Connectivity:** Connect seamlessly to your **PostgreSQL** database. The architecture is designed to be extended to other engines like MongoDB and Redis in the future.
+*   **Database Connectivity:** Connect seamlessly to **PostgreSQL**, **MongoDB**, and **Redis**.
 *   **Dual Query Modes:**
-    *   **Natural Language Query:** Ask questions in plain English and have an AI generate the SQL query for you.
-    *   **Raw Query Editor:** A powerful editor with SQL syntax highlighting for writing and executing queries directly.
+    *   **Natural Language Query:** Ask questions in plain English and have an AI generate the SQL, MongoDB, or Redis query for you.
+    *   **Raw Query Editor:** A powerful editor with syntax highlighting for writing and executing queries directly.
 *   **Conversational Chatbot:** An intuitive chat interface to ask questions, get generated queries for confirmation, and see results, all within a continuous conversation.
-*   **AI-Powered:** Integrated with Google Gemini and OpenAI (ChatGPT) to power the natural language-to-SQL functionality.
+*   **Saved Queries:** Save your favorite or complex queries to re-run them later with a single click.
+*   **AI-Powered:** Integrated with **Google Gemini**, **OpenAI (ChatGPT)**, and **Groq (Llama 3)** to power the natural language-to-query functionality.
 *   **Schema Explorer:** Automatically discovers and displays the tables and columns of the connected PostgreSQL database.
 *   **Secure by Default:**
     *   JWT-based authentication for secure user sessions.
@@ -103,8 +104,8 @@ This project is a modern full-stack application built with:
     *   **Framework:** **Python 3.13+** with **FastAPI**
     *   **Validation:** **Pydantic**
     *   **Authentication:** **Passlib** and **python-jose**
-    *   **Database Driver:** `psycopg2` for PostgreSQL
-    *   **AI Integration:** `google-generativeai` and `openai` SDKs
+    *   **Database Drivers:** `psycopg2` (PostgreSQL), `motor` (MongoDB), `redis` (Redis)
+    *   **AI Integration:** `google-generativeai`, `openai`, and `groq` SDKs
     *   **MCP:** `mcp` and `fastmcp` for Model Context Protocol integration
 *   **Frontend:**
     *   **Framework:** **React 18** with **Vite**
@@ -144,12 +145,18 @@ cd mcp-nocode-db
     # For LLM Services
     GOOGLE_API_KEY="your_google_api_key_here"
     OPENAI_API_KEY="your_openai_api_key_here"
+    GROQ_API_KEY="your_groq_api_key_here"
 
     # For JWT Authentication
     SECRET_KEY="a_very_secret_key_for_jwt_tokens_change_me"
     ALGORITHM="HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES=60
     ```
+
+4.  **Configure Databases & LLM:**
+    *   The application uses a configuration file at `backend/config/config.yaml`.
+    *   This file defines your database connections (Postgres, Mongo, Redis) and selects your active LLM provider.
+    *   **Review and update** `backend/config/config.yaml` to match your local or docker environment.
 
 ### 3. Build and Run with Docker Compose
 
@@ -162,7 +169,7 @@ This command starts the frontend, backend, and a PostgreSQL database.
 *   Backend will be available at `http://localhost:8000`.
 *   Frontend will be available at `http://localhost:5173`.
 
-*(Note: The Docker Compose file also defines MongoDB and Redis services, but they are not used by the application in its current state.)*
+*(Note: The Docker Compose file defines PostgreSQL, MongoDB, and Redis services. Configure them in `backend/config/config.yaml` to use them.)*
 
 ### 4. Seed the Database
 
@@ -187,8 +194,8 @@ You're all set!
 ## 🛠️ TODO & Future Enhancements
 
 This project is a strong foundation. Future improvements could include:
-*   [ ] **Enable Multi-Database Support:** Activate the connectors for MongoDB, Redis, and other engines.
-*   [ ] **Saved Queries:** Implement the UI and API endpoints to save and re-run frequently used queries.
+*   [x] **Enable Multi-Database Support:** Support for MongoDB and Redis.
+*   [x] **Saved Queries:** Implement the UI and API endpoints to save and re-run frequently used queries.
 *   [ ] **Modal Windows:** Create dedicated modal windows for a deep-dive view of a specific table.
 *   [ ] **Advanced RBAC:** Implement more granular permissions (e.g., access per database, per role).
 *   [ ] **Production Hardening:** Move secrets to a secure vault.
