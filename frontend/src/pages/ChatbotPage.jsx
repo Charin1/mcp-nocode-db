@@ -1,97 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import apiClient from 'api/apiClient';
 import { useDbStore } from 'stores/dbStore';
-import SimpleCodeEditor from 'react-simple-code-editor';
-import { highlight, languages } from 'prismjs/components/prism-core';
-import 'prismjs/components/prism-sql';
-import 'prismjs/themes/prism-tomorrow.css';
-import { AgGridReact } from 'ag-grid-react';
-import "ag-grid-community/styles/ag-grid.css";
-import "ag-grid-community/styles/ag-theme-alpine.css";
-import ChartVisualization from 'components/chat/ChartVisualization';
+import ChatMessage from 'components/chat/ChatMessage';
+import ChatInput from 'components/chat/ChatInput';
 
 const CONTEXT_LIMIT = 10; // Max number of messages in a conversation
 
-const ChatResults = ({ results, onVisualize, showChart, chartConfig }) => {
-    if (!results || !results.rows || results.rows.length === 0) {
-        return <p className="text-sm text-gray-400 mt-2">Query executed successfully, but returned no rows.</p>;
-    }
-
-    const columnDefs = results.columns.map(col => ({ field: col, sortable: true, filter: true }));
-    const rowData = results.rows;
-
-    return (
-        <div className="mt-3">
-            <div className="ag-theme-alpine-dark" style={{ height: 300, width: '100%' }}>
-                <AgGridReact
-                    columnDefs={columnDefs}
-                    rowData={rowData}
-                    domLayout='autoHeight'
-                />
-            </div>
-            <div className="mt-3 flex space-x-2">
-                <button
-                    onClick={onVisualize}
-                    className="px-3 py-1 text-xs rounded bg-purple-600 hover:bg-purple-700 flex items-center space-x-1"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span>Visualize</span>
-                </button>
-            </div>
-            {showChart && (
-                <ChartVisualization results={results} chartConfig={chartConfig} />
-            )}
-        </div>
-    );
-};
-
-
-const QueryConfirmation = ({ query, onExecute, onCancel }) => {
-    return (
-        <div className="mt-2 p-3 rounded-lg bg-gray-800 border border-gray-600">
-            <p className="text-sm text-gray-300 mb-2">Generated SQL Query:</p>
-            <div className="text-sm bg-gray-900 rounded-md">
-                <SimpleCodeEditor
-                    value={query}
-                    onValueChange={() => { }}
-                    highlight={code => highlight(code, languages.sql, 'sql')}
-                    padding={10}
-                    style={{
-                        fontFamily: '"Fira code", "Fira Mono", monospace',
-                        fontSize: 14,
-                    }}
-                    readOnly
-                />
-            </div>
-            <div className="mt-3 flex justify-end space-x-2">
-                <button
-                    onClick={onCancel}
-                    className="px-3 py-1 text-xs rounded bg-gray-600 hover:bg-gray-700"
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={() => onExecute(query)}
-                    className="px-3 py-1 text-xs rounded bg-green-600 hover:bg-green-700"
-                >
-                    Execute
-                </button>
-            </div>
-        </div>
-    );
-};
-
-
 const ChatbotPage = () => {
-    const initialMessage = { role: 'assistant', content: 'Hello! How can I help you with your database today?' };
+    const initialMessage = {
+        role: 'assistant',
+        content: 'Hello! I am your database assistant. Ask me questions about your data, or tell me what you want to find.'
+    };
     const [messages, setMessages] = useState([initialMessage]);
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isContextLimitReached, setIsContextLimitReached] = useState(false);
-    const [visibleCharts, setVisibleCharts] = useState({});  // Track which message indices have charts visible
-    const chatContainerRef = useRef(null);
+    const [visibleCharts, setVisibleCharts] = useState({});
+    const chatEndRef = useRef(null);
 
     const { selectedDbId, llmProvider } = useDbStore(state => ({
         selectedDbId: state.selectedDbId,
@@ -105,17 +30,14 @@ const ChatbotPage = () => {
     }, [messages]);
 
     useEffect(() => {
-        // Scroll to the bottom of the chat container
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [messages]);
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, isLoading]);
 
     const handleSendMessage = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
+
         if (!userInput.trim() || !selectedDbId) return;
 
-        // DEBUG: Check if token exists
         const token = localStorage.getItem('accessToken');
         if (!token) {
             alert("No authentication token found! You need to log in.");
@@ -128,7 +50,6 @@ const ChatbotPage = () => {
         setIsLoading(true);
 
         try {
-            // Sanitize messages to only include fields expected by the backend
             const payloadMessages = newMessages.map(({ role, content, query }) => ({
                 role,
                 content,
@@ -140,7 +61,7 @@ const ChatbotPage = () => {
                 model_provider: llmProvider,
                 messages: payloadMessages,
             }, {
-                timeout: 15000 // 15 second timeout to prevent endless hanging
+                timeout: 30000
             });
 
             setMessages([...newMessages, res.data]);
@@ -157,11 +78,6 @@ const ChatbotPage = () => {
             }
 
             setMessages([...newMessages, { role: 'assistant', content: errorMsg }]);
-            if (error.response?.data?.detail) {
-                // Stringify the detail object to make it readable
-                errorMsg = `Error: ${JSON.stringify(error.response.data.detail, null, 2)}`;
-            }
-            setMessages([...newMessages, { role: 'assistant', content: errorMsg }]);
         } finally {
             setIsLoading(false);
         }
@@ -169,24 +85,30 @@ const ChatbotPage = () => {
 
     const handleExecuteQuery = async (query) => {
         setIsLoading(true);
+        // Find the index of the message containing this query to append result after it
+        // Simpler approach: just append to end of list
         try {
             const res = await apiClient.post('/api/query/execute', {
                 db_id: selectedDbId,
                 raw_query: query,
                 model_provider: llmProvider,
             });
+
+            // We need to associate results with a message or append a new one
+            // Current flow: Append a new assistant message with results
             const resultMessage = {
                 role: 'assistant',
-                content: 'Here are the results of your query.',
+                content: 'Query executed successfully. Here are the results:',
                 results: res.data
             };
-            setMessages([...messages, resultMessage]);
+            setMessages(prev => [...prev, resultMessage]);
+
         } catch (error) {
             let errorMsg = 'An unexpected error occurred while executing the query.';
             if (error.response?.data?.detail) {
                 errorMsg = `Error executing query: ${JSON.stringify(error.response.data.detail, null, 2)}`;
             }
-            setMessages([...messages, { role: 'assistant', content: errorMsg }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
         } finally {
             setIsLoading(false);
         }
@@ -198,72 +120,64 @@ const ChatbotPage = () => {
     };
 
     return (
-        <div className="flex flex-col p-4 bg-gray-800 text-white">
-            <h1 className="text-2xl font-bold mb-4">Chatbot</h1>
-            <div ref={chatContainerRef} className="flex-1 border rounded-lg p-4 bg-gray-900 overflow-y-auto space-y-4">
-                {messages.map((msg, index) => (
-                    <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div
-                            className={`p-3 rounded-lg max-w-lg ${msg.role === 'user' ? 'bg-blue-600' : 'bg-gray-700'
-                                }`}
-                        >
-                            <p>{msg.content}</p>
-                            {msg.query && !isContextLimitReached && (
-                                <QueryConfirmation
-                                    query={msg.query}
-                                    onExecute={handleExecuteQuery}
-                                    onCancel={() => {
-                                        const newMessages = [...messages, { role: 'assistant', content: 'Okay, I will not execute that query.' }];
-                                        setMessages(newMessages);
-                                    }}
-                                />
-                            )}
-                            {msg.results && (
-                                <ChatResults
-                                    results={msg.results}
-                                    onVisualize={() => setVisibleCharts(prev => ({ ...prev, [index]: !prev[index] }))}
-                                    showChart={visibleCharts[index]}
-                                    chartConfig={null}
-                                />
-                            )}
+        <div className="flex flex-col h-full bg-[#0f1117] text-gray-100 font-sans relative">
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto w-full">
+                <div className="max-w-3xl mx-auto px-4 pt-8 pb-32">
+                    {messages.map((msg, index) => (
+                        <ChatMessage
+                            key={index}
+                            message={msg}
+                            isLast={index === messages.length - 1}
+                            onExecuteQuery={handleExecuteQuery}
+                            onVisualize={() => setVisibleCharts(prev => ({ ...prev, [index]: !prev[index] }))}
+                            visibleCharts={visibleCharts[index]}
+                            chartConfig={null}
+                        />
+                    ))}
+
+                    {isLoading && (
+                        <div className="flex space-x-6 py-6 animate-pulse">
+                            <div className="w-8 h-8 rounded-lg bg-gray-800 flex-shrink-0" />
+                            <div className="space-y-3 flex-1 min-w-0">
+                                <div className="h-4 bg-gray-800 rounded w-1/4"></div>
+                                <div className="h-4 bg-gray-800 rounded w-3/4"></div>
+                            </div>
                         </div>
-                    </div>
-                ))}
-                {isContextLimitReached && (
-                    <div className="text-center p-4">
-                        <p className="text-yellow-400 mb-2">Context limit reached.</p>
-                        <button
-                            onClick={handleStartNewConversation}
-                            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700"
-                        >
-                            Start New Conversation
-                        </button>
-                    </div>
-                )}
+                    )}
+
+                    {isContextLimitReached && (
+                        <div className="text-center p-8 border border-yellow-500/20 bg-yellow-900/10 rounded-xl mt-8">
+                            <p className="text-yellow-400 mb-3 font-medium">Context limit reached.</p>
+                            <button
+                                onClick={handleStartNewConversation}
+                                className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+                            >
+                                Start New Chat
+                            </button>
+                        </div>
+                    )}
+                    <div ref={chatEndRef} />
+                </div>
             </div>
-            <form onSubmit={handleSendMessage} className="mt-4 flex">
-                <input
-                    type="text"
+
+            {/* Floating Input Area - Fixed at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#0f1117] via-[#0f1117] to-transparent pt-10 px-4">
+                <ChatInput
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
+                    onSubmit={handleSendMessage}
+                    isLoading={isLoading}
+                    disabled={!selectedDbId || isContextLimitReached}
                     placeholder={
                         isContextLimitReached
-                            ? "Please start a new conversation."
+                            ? "Start a new conversation..."
                             : selectedDbId
                                 ? "Ask a question about your data..."
-                                : "Please select a database first."
+                                : "Select a database to start chatting..."
                     }
-                    className="flex-1 p-2 rounded-l-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={!selectedDbId || isLoading || isContextLimitReached}
                 />
-                <button
-                    type="submit"
-                    className="px-4 py-2 rounded-r-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500"
-                    disabled={!selectedDbId || isLoading || isContextLimitReached || !userInput.trim()}
-                >
-                    {isLoading ? '...' : 'Send'}
-                </button>
-            </form>
+            </div>
         </div>
     );
 };

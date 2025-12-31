@@ -11,19 +11,29 @@ const transformResultsToChartData = (results) => {
     if (!results || !results.rows || results.rows.length === 0) {
         return [];
     }
-    return results.rows;
+
+    // Attempt to convert numeric strings to numbers for visualization
+    return results.rows.map(row => {
+        const newRow = { ...row };
+        Object.keys(newRow).forEach(key => {
+            const val = newRow[key];
+            if (typeof val === 'string' && !isNaN(val) && val.trim() !== '') {
+                // Check if it really looks like a number (not just a date string that parses to number?)
+                // Simple float parse
+                newRow[key] = parseFloat(val);
+            }
+        });
+        return newRow;
+    });
 };
 
 // Automatically determine best chart config based on data
-const autoDetectChartConfig = (results) => {
-    if (!results || !results.columns || results.columns.length === 0) {
+const autoDetectChartConfig = (data, columns) => {
+    if (!columns || columns.length === 0 || !data || data.length === 0) {
         return null;
     }
 
-    const columns = results.columns;
-    const rows = results.rows || [];
-
-    if (rows.length === 0) return null;
+    const rows = data;
 
     // Find numeric and categorical columns
     const numericColumns = [];
@@ -71,7 +81,7 @@ const autoDetectChartConfig = (results) => {
 
 const ChartVisualization = ({ results, chartConfig }) => {
     const data = transformResultsToChartData(results);
-    const config = chartConfig || autoDetectChartConfig(results);
+    const config = chartConfig || autoDetectChartConfig(data, results?.columns);
 
     if (!data || data.length === 0 || !config) {
         return (
