@@ -21,10 +21,16 @@ class LLMService:
             genai.configure(api_key=google_api_key)
 
         # Configure OpenAI
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_client = None
+        if self.openai_api_key:
+             self.openai_client = OpenAI(api_key=self.openai_api_key)
 
         # Configure Groq
-        self.groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+        self.groq_api_key = os.getenv("GROQ_API_KEY")
+        self.groq_client = None
+        if self.groq_api_key:
+             self.groq_client = AsyncGroq(api_key=self.groq_api_key)
 
     async def generate_query(
         self, provider: str, natural_language_query: str, schema: str, engine: str
@@ -222,6 +228,12 @@ class LLMService:
             )
 
     async def _generate_with_chatgpt(self, prompt: str, engine: str) -> GeneratedQuery:
+        if not self.openai_client:
+            return GeneratedQuery(
+                raw_query="", 
+                error="OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.", 
+                query_type=engine
+            )
         try:
             model_name = self.config["providers"]["chatgpt"]["model"]
             response = self.openai_client.chat.completions.create(
@@ -242,6 +254,12 @@ class LLMService:
             )
 
     async def _generate_with_groq(self, prompt: str, engine: str) -> GeneratedQuery:
+        if not self.groq_client:
+            return GeneratedQuery(
+                raw_query="", 
+                error="Groq API key not configured. Please set GROQ_API_KEY environment variable.", 
+                query_type=engine
+            )
         try:
             model_name = self.config["providers"]["groq"]["model"]
             response = await self.groq_client.chat.completions.create(
@@ -343,6 +361,8 @@ class LLMService:
     async def _generate_chat_with_chatgpt(
         self, system_prompt: str, messages: List[ChatMessage]
     ) -> str:
+        if not self.openai_client:
+             return "Error: OpenAI API key not configured."
         try:
             model_name = self.config["providers"]["chatgpt"]["model"]
             # Sanitize to only include role and content (APIs don't accept extra fields)
@@ -362,6 +382,8 @@ class LLMService:
     async def _generate_chat_with_groq(
         self, system_prompt: str, messages: List[ChatMessage]
     ) -> str:
+        if not self.groq_client:
+             return "Error: Groq API key not configured."
         try:
             model_name = self.config["providers"]["groq"]["model"]
             # Sanitize to only include role and content (APIs don't accept extra fields)
