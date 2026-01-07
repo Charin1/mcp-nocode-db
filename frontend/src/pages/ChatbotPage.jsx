@@ -45,14 +45,22 @@ const ChatbotPage = () => {
 
     // --- API Interactions ---
 
-    const fetchSessions = async () => {
+    const fetchSessions = async (query = '') => {
         try {
-            const res = await apiClient.get('/api/chatbot/sessions');
+            const endpoint = query
+                ? `/api/chatbot/sessions?q=${encodeURIComponent(query)}`
+                : '/api/chatbot/sessions';
+            const res = await apiClient.get(endpoint);
             setSessions(res.data);
         } catch (error) {
             console.error("Failed to load sessions:", error);
         }
     };
+
+    const handleSearch = (query) => {
+        fetchSessions(query);
+    }
+
 
     const handleNewSession = async () => {
         if (!selectedDbId) {
@@ -78,6 +86,36 @@ const ChatbotPage = () => {
             alert("Failed to create new chat session.");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleRenameSession = async (sessionId, newTitle) => {
+        try {
+            await apiClient.put(`/api/chatbot/sessions/${sessionId}`, { title: newTitle });
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: newTitle } : s));
+        } catch (error) {
+            console.error("Failed to rename session:", error);
+            alert("Failed to rename chat.");
+        }
+    };
+
+    const handleDeleteSession = async (sessionId) => {
+        try {
+            await apiClient.delete(`/api/chatbot/sessions/${sessionId}`);
+            const newSessions = sessions.filter(s => s.id !== sessionId);
+            setSessions(newSessions);
+
+            if (sessionId === currentSessionId) {
+                if (newSessions.length > 0) {
+                    handleSelectSession(newSessions[0].id);
+                } else {
+                    setCurrentSessionId(null);
+                    setMessages([defaultMessage]);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to delete session:", error);
+            alert("Failed to delete chat.");
         }
     };
 
@@ -227,6 +265,9 @@ const ChatbotPage = () => {
                     currentSessionId={currentSessionId}
                     onSelectSession={handleSelectSession}
                     onNewSession={handleNewSession}
+                    onSearch={handleSearch}
+                    onRenameSession={handleRenameSession}
+                    onDeleteSession={handleDeleteSession}
                     isLoading={isLoading}
                 />
             </div>

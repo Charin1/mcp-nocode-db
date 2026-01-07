@@ -90,7 +90,7 @@ class ChatService:
         )
 
     @classmethod
-    def get_user_sessions(cls, user_id: str) -> List[ChatSession]:
+    def get_user_sessions(cls, user_id: str, search_query: str = None) -> List[ChatSession]:
         if not cls._initialized:
              cls.initialize()
 
@@ -98,14 +98,61 @@ class ChatService:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT * FROM chat_sessions WHERE user_id = ? ORDER BY created_at DESC", 
-            (user_id,)
-        )
+        if search_query:
+            # Simple case-insensitive match
+            query = "SELECT * FROM chat_sessions WHERE user_id = ? AND title LIKE ? ORDER BY created_at DESC"
+            params = (user_id, f"%{search_query}%")
+        else:
+            query = "SELECT * FROM chat_sessions WHERE user_id = ? ORDER BY created_at DESC"
+            params = (user_id,)
+
+        cursor.execute(query, params)
         rows = cursor.fetchall()
         conn.close()
 
         return [ChatSession(**dict(row)) for row in rows]
+
+    @classmethod
+    def rename_session(cls, session_id: int, user_id: str, new_title: str) -> bool:
+        if not cls._initialized:
+             cls.initialize()
+
+        conn = sqlite3.connect(cls._db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "UPDATE chat_sessions SET title = ? WHERE id = ? AND user_id = ?", 
+            (new_title, session_id, user_id)
+        )
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return affected > 0
+
+    @classmethod
+    def delete_session(cls, session_id: int, user_id: str) -> bool:
+        if not cls._initialized:
+             cls.initialize()
+
+        conn = sqlite3.connect(cls._db_path)
+        cursor = conn.cursor()
+
+        # Cascade delete is configured in table creation, but sqlite needs foreign keys enabled?
+        # By default sqlite foreign keys are OFF. We should enable or manually delete messages.
+        # Let's enable FK support or manually delete.
+        cursor.execute("PRAGMA foreign_keys = ON")
+        
+        cursor.execute(
+            "DELETE FROM chat_sessions WHERE id = ? AND user_id = ?", 
+            (session_id, user_id)
+        )
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return affected > 0
+
 
     @classmethod
     def get_session(cls, session_id: int, user_id: str) -> Optional[ChatSession]:

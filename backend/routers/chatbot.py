@@ -45,10 +45,13 @@ async def create_session(
 
 
 @router.get("/sessions", response_model=List[ChatSession])
-async def get_user_sessions(current_user: User = Depends(get_current_user)):
-    """List all chat sessions for the current user."""
+async def get_user_sessions(
+    q: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """List all chat sessions for the current user, optionally filtered by title."""
     try:
-        return ChatService.get_user_sessions(user_id=current_user.username)
+        return ChatService.get_user_sessions(user_id=current_user.username, search_query=q)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -64,6 +67,38 @@ async def get_session(
     
     messages = ChatService.get_session_messages(session_id=session_id)
     return InitialChatResponse(session=session, messages=messages)
+
+
+@router.put("/sessions/{session_id}")
+async def rename_session(
+    session_id: int, 
+    request: Dict[str, str], # Expecting {"title": "new title"}
+    current_user: User = Depends(get_current_user)
+):
+    """Rename a chat session."""
+    new_title = request.get("title")
+    if not new_title:
+        raise HTTPException(status_code=400, detail="Title is required")
+        
+    success = ChatService.rename_session(session_id, current_user.username, new_title)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {"status": "success", "message": "Session renamed"}
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: int, 
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a chat session."""
+    success = ChatService.delete_session(session_id, current_user.username)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {"status": "success", "message": "Session deleted"}
+
 
 
 @router.post("/sessions/{session_id}/message", response_model=List[ChatMessageDB])
