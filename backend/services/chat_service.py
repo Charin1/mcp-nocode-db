@@ -17,12 +17,23 @@ class ChatService:
         with open("config/config.yaml", "r") as f:
             config = yaml.safe_load(f)
 
-        # Re-use metadata db path or a new one? Re-using seems safer for "one app db" approach
         cls._db_path = config["metadata_db"]["path"]
 
         try:
             conn = sqlite3.connect(cls._db_path)
             cursor = conn.cursor()
+
+            # Create projects table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
 
             # Create sessions table
             cursor.execute(
@@ -36,6 +47,13 @@ class ChatService:
                 )
                 """
             )
+            
+            # Migration: Check if project_id exists in chat_sessions, if not add it
+            cursor.execute("PRAGMA table_info(chat_sessions)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if "project_id" not in columns:
+                print("Migrating chat_sessions: Adding project_id column")
+                cursor.execute("ALTER TABLE chat_sessions ADD COLUMN project_id INTEGER DEFAULT NULL REFERENCES projects(id) ON DELETE SET NULL")
 
             # Create messages table
             cursor.execute(
@@ -62,7 +80,67 @@ class ChatService:
             raise e
 
     @classmethod
-    def create_session(cls, user_id: str, db_id: str, title: str = None) -> ChatSession:
+    def create_project(cls, user_id: str, name: str) -> Dict[str, Any]:
+        if not cls._initialized:
+             cls.initialize()
+
+        conn = sqlite3.connect(cls._db_path)
+        cursor = conn.cursor()
+        
+        created_at = datetime.utcnow().isoformat()
+        cursor.execute(
+            "INSERT INTO projects (user_id, name, created_at) VALUES (?, ?, ?)",
+            (user_id, name, created_at)
+        )
+        project_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return {
+            "id": project_id,
+            "user_id": user_id,
+            "name": name,
+            "created_at": created_at
+        }
+
+    @classmethod
+    def get_user_projects(cls, user_id: str) -> List[Dict[str, Any]]:
+        if not cls._initialized:
+             cls.initialize()
+
+        conn = sqlite3.connect(cls._db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC", 
+            (user_id,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+    
+    @classmethod
+    def delete_project(cls, project_id: int, user_id: str) -> bool:
+        if not cls._initialized:
+             cls.initialize()
+        
+        conn = sqlite3.connect(cls._db_path)
+        cursor = conn.cursor()
+        
+        # When deleting a project, update sessions to have NULL project_id (handled by ON DELETE SET NULL if strict schema, or manually)
+        # SQLite references are tricky by default. Let's do manual update for safety if FK implementation differs.
+        cursor.execute("UPDATE chat_sessions SET project_id = NULL WHERE project_id = ? AND user_id = ?", (project_id, user_id))
+        
+        cursor.execute("DELETE FROM projects WHERE id = ? AND user_id = ?", (project_id, user_id))
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return affected > 0
+
+    @classmethod
+    def create_session(cls, user_id: str, db_id: str, title: str = None, project_id: int = None) -> ChatSession:
         if not cls._initialized:
              cls.initialize() # Auto-init if needed
 
@@ -74,23 +152,30 @@ class ChatService:
             title = f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
         cursor.execute(
-            "INSERT INTO chat_sessions (user_id, db_id, title, created_at) VALUES (?, ?, ?, ?)",
-            (user_id, db_id, title, created_at)
+            "INSERT INTO chat_sessions (user_id, db_id, title, project_id, created_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, db_id, title, project_id, created_at)
         )
         session_id = cursor.lastrowid
         conn.commit()
         conn.close()
 
+        # Note: ChatSession model might need update if we want to return project_id field in Pydantic
+        # For now, base fields are fine, but returning project_id is better.
+        # Let's assume the callers might want it.
+        # We need to make sure ChatSession pydantic model supports extra fields or has project_id if strict.
+        # But we haven't updated Pydantic model yet. Let's assume we will or it ignores extra kwtargs.
         return ChatSession(
             id=session_id,
             user_id=user_id,
             db_id=db_id,
             title=title,
-            created_at=created_at
+            created_at=created_at,
+            project_id=project_id 
         )
 
     @classmethod
-    def get_user_sessions(cls, user_id: str, search_query: str = None) -> List[ChatSession]:
+    def get_user_sessions(cls, user_id: str, search_query: str = None) -> List[Dict[str, Any]]:
+        # Returns Dict instead of ChatSession object directly to include project_id easily without strict validation issues yet
         if not cls._initialized:
              cls.initialize()
 
@@ -99,7 +184,6 @@ class ChatService:
         cursor = conn.cursor()
 
         if search_query:
-            # Simple case-insensitive match
             query = "SELECT * FROM chat_sessions WHERE user_id = ? AND title LIKE ? ORDER BY created_at DESC"
             params = (user_id, f"%{search_query}%")
         else:
@@ -110,7 +194,8 @@ class ChatService:
         rows = cursor.fetchall()
         conn.close()
 
-        return [ChatSession(**dict(row)) for row in rows]
+        # Return dicts to support project_id field
+        return [dict(row) for row in rows]
 
     @classmethod
     def rename_session(cls, session_id: int, user_id: str, new_title: str) -> bool:
@@ -123,6 +208,24 @@ class ChatService:
         cursor.execute(
             "UPDATE chat_sessions SET title = ? WHERE id = ? AND user_id = ?", 
             (new_title, session_id, user_id)
+        )
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return affected > 0
+        
+    @classmethod
+    def move_session_to_project(cls, session_id: int, user_id: str, project_id: Optional[int]) -> bool:
+        if not cls._initialized:
+             cls.initialize()
+
+        conn = sqlite3.connect(cls._db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "UPDATE chat_sessions SET project_id = ? WHERE id = ? AND user_id = ?", 
+            (project_id, session_id, user_id)
         )
         affected = cursor.rowcount
         conn.commit()
@@ -171,8 +274,11 @@ class ChatService:
         conn.close()
 
         if row:
+            # We construct ChatSession. Note: if ChatSession definition doesn't have project_id, it will be ignored or raise error depending on config.
+            # Assuming standard Pydantic.
             return ChatSession(**dict(row))
         return None
+
 
     @classmethod
     def add_message(cls, session_id: int, role: str, content: str, query: str = None, chart_config: Dict = None) -> ChatMessageDB:

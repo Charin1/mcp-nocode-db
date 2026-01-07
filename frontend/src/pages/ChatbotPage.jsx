@@ -13,8 +13,10 @@ const ChatbotPage = () => {
     };
 
     // State
+    // State
     const [messages, setMessages] = useState([defaultMessage]);
     const [sessions, setSessions] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(null);
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -30,9 +32,10 @@ const ChatbotPage = () => {
 
     // --- Effects ---
 
-    // Load sessions on mount or when auth/user might change (re-mount)
+    // Load sessions and projects on mount
     useEffect(() => {
         fetchSessions();
+        fetchProjects();
     }, []);
 
     // Scroll to bottom when messages change
@@ -40,10 +43,16 @@ const ChatbotPage = () => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
 
-    // If selectedDbId changes and we have no active session or session belongs to diff DB,
-    // maybe prompt new session? For now, we just let user switch.
-
     // --- API Interactions ---
+
+    const fetchProjects = async () => {
+        try {
+            const res = await apiClient.get('/api/chatbot/projects');
+            setProjects(res.data);
+        } catch (error) {
+            console.error("Failed to load projects:", error);
+        }
+    };
 
     const fetchSessions = async (query = '') => {
         try {
@@ -61,8 +70,31 @@ const ChatbotPage = () => {
         fetchSessions(query);
     }
 
+    const handleCreateProject = async (name) => {
+        try {
+            const res = await apiClient.post('/api/chatbot/projects', { name });
+            setProjects([res.data, ...projects]);
+        } catch (error) {
+            console.error("Failed to create project:", error);
+            alert("Failed to create project.");
+        }
+    };
 
-    const handleNewSession = async () => {
+    const handleDeleteProject = async (projectId) => {
+        if (!window.confirm("Delete this project and all its chats?")) return;
+        try {
+            await apiClient.delete(`/api/chatbot/projects/${projectId}`);
+            setProjects(projects.filter(p => p.id !== projectId));
+            // Also remove sessions that belonged to this project from local state
+            // (Assuming backend cascades delete, or we need to refresh sessions)
+            fetchSessions();
+        } catch (error) {
+            console.error("Failed to delete project:", error);
+            alert("Failed to delete project.");
+        }
+    };
+
+    const handleNewSession = async (projectId = null) => {
         if (!selectedDbId) {
             alert("Please select a database first.");
             return;
@@ -72,15 +104,14 @@ const ChatbotPage = () => {
             setIsLoading(true);
             const res = await apiClient.post('/api/chatbot/sessions', {
                 db_id: selectedDbId,
-                title: `New Chat`, // Backend adds timestamp
+                title: `New Chat`,
+                project_id: projectId
             });
 
             const newSession = res.data;
             setSessions([newSession, ...sessions]);
             setCurrentSessionId(newSession.id);
             setMessages([defaultMessage]);
-            // Note: Backend creates empty session, we show default welcome msg locally. 
-            // Alternatively, backend could seed it.
         } catch (error) {
             console.error("Error creating session:", error);
             alert("Failed to create new chat session.");
@@ -96,6 +127,16 @@ const ChatbotPage = () => {
         } catch (error) {
             console.error("Failed to rename session:", error);
             alert("Failed to rename chat.");
+        }
+    };
+
+    const handleMoveSessionToProject = async (sessionId, projectId) => {
+        try {
+            await apiClient.put(`/api/chatbot/sessions/${sessionId}`, { project_id: projectId });
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, project_id: projectId } : s));
+        } catch (error) {
+            console.error("Failed to move session:", error);
+            alert("Failed to move chat.");
         }
     };
 
@@ -262,12 +303,16 @@ const ChatbotPage = () => {
             <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block h-full`}>
                 <SessionList
                     sessions={sessions}
+                    projects={projects}
                     currentSessionId={currentSessionId}
                     onSelectSession={handleSelectSession}
                     onNewSession={handleNewSession}
                     onSearch={handleSearch}
                     onRenameSession={handleRenameSession}
                     onDeleteSession={handleDeleteSession}
+                    onCreateProject={handleCreateProject}
+                    onDeleteProject={handleDeleteProject}
+                    onMoveSession={handleMoveSessionToProject}
                     isLoading={isLoading}
                 />
             </div>

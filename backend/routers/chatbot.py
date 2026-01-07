@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from models.auth import User
 from models.query import ChatRequest, ChatMessage
-from models.chat import ChatSession, ChatMessageDB, CreateSessionRequest, InitialChatResponse
+from models.chat import ChatSession, ChatMessageDB, CreateSessionRequest, InitialChatResponse, Project, CreateProjectRequest
 from services.llm_service import LLMService
 from services.db_manager import DbManager
 from services.security import get_current_user
@@ -25,6 +25,43 @@ class VisualizationResponse(BaseModel):
     chart_config: Dict[str, Any]
     message: str
 
+# --- Project Management Endpoints ---
+
+@router.post("/projects", response_model=Project)
+async def create_project(
+    request: CreateProjectRequest, current_user: User = Depends(get_current_user)
+):
+    """Create a new project folder."""
+    try:
+        project_data = ChatService.create_project(
+            user_id=current_user.username,
+            name=request.name
+        )
+        return Project(**project_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/projects", response_model=List[Project])
+async def get_user_projects(current_user: User = Depends(get_current_user)):
+    """List all projects for the current user."""
+    try:
+        projects_data = ChatService.get_user_projects(user_id=current_user.username)
+        return [Project(**p) for p in projects_data]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/projects/{project_id}")
+async def delete_project(
+    project_id: int, 
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a project and unlink its sessions."""
+    success = ChatService.delete_project(project_id, current_user.username)
+    if not success:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    return {"status": "success", "message": "Project deleted"}
+
 
 # --- Session Management Endpoints ---
 
@@ -37,10 +74,12 @@ async def create_session(
         session = ChatService.create_session(
             user_id=current_user.username,
             db_id=request.db_id,
-            title=request.title
+            title=request.title,
+            project_id=request.project_id
         )
         return session
     except Exception as e:
+        print(f"Error creating session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -51,8 +90,11 @@ async def get_user_sessions(
 ):
     """List all chat sessions for the current user, optionally filtered by title."""
     try:
-        return ChatService.get_user_sessions(user_id=current_user.username, search_query=q)
+        # ChatService returns dicts now
+        sessions_data = ChatService.get_user_sessions(user_id=current_user.username, search_query=q)
+        return [ChatSession(**s) for s in sessions_data]
     except Exception as e:
+        print(f"Error fetching sessions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -70,21 +112,31 @@ async def get_session(
 
 
 @router.put("/sessions/{session_id}")
-async def rename_session(
+async def update_session(
     session_id: int, 
-    request: Dict[str, str], # Expecting {"title": "new title"}
+    request: Dict[str, Any], # Expecting {"title": "new title"} or {"project_id": 123} or {"project_id": null}
     current_user: User = Depends(get_current_user)
 ):
-    """Rename a chat session."""
-    new_title = request.get("title")
-    if not new_title:
-        raise HTTPException(status_code=400, detail="Title is required")
-        
-    success = ChatService.rename_session(session_id, current_user.username, new_title)
-    if not success:
-        raise HTTPException(status_code=404, detail="Session not found")
+    """Rename a chat session or move it to a project."""
     
-    return {"status": "success", "message": "Session renamed"}
+    # Handle Rename
+    if "title" in request:
+        new_title = request.get("title")
+        if not new_title:
+             raise HTTPException(status_code=400, detail="Title cannot be empty")
+        success = ChatService.rename_session(session_id, current_user.username, new_title)
+        if not success:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+    # Handle Move to Project
+    if "project_id" in request:
+        project_id = request.get("project_id") # Can be None (for removing from project)
+        success = ChatService.move_session_to_project(session_id, current_user.username, project_id)
+        if not success:
+             raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {"status": "success", "message": "Session updated"}
+
 
 
 @router.delete("/sessions/{session_id}")
