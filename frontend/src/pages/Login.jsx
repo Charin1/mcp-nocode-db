@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { useAuth } from 'context/AuthContext'; // Corrected import path
+import { useAuth } from 'context/AuthContext';
 import Spinner from 'components/common/Spinner';
 
 const Login = () => {
@@ -16,6 +16,9 @@ const Login = () => {
     setLoading(true);
     try {
       await login(email, password);
+      // navigation is handled by AuthContext state change or manually here if needed
+      // But since isAuthenticated changes, the <Navigate /> below might trigger or parent route might redirect
+      // For safety we can navigate, but usually we just let the state change handle it if wrapped in a PrivateRoute check
       navigate('/');
     } catch (error) {
       toast.error("Login failed. Please check your credentials.");
@@ -71,6 +74,12 @@ const Login = () => {
             </button>
           </div>
         </form>
+        <div className="text-center text-gray-400">
+          Don't have an account?{' '}
+          <Link to="/signup" className="text-brand-blue hover:text-blue-400">
+            Sign up
+          </Link>
+        </div>
       </div>
     </div>
   );
