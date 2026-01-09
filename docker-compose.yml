@@ -1,62 +1,59 @@
 version: '3.8'
 
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
-      - ./backend/db:/app/db # Persist audit database
-    env_file:
-      - ./backend/.env
-    depends_on:
-      - postgres
-      - mongo
-      - redis
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules # Use node_modules from container, not host
-    depends_on:
-      - backend
+  db:
+    image: postgres:15-alpine
+    restart: always
     environment:
-      - VITE_API_BASE_URL=http://localhost:8000
-
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: admin
+      POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: maindb
+      POSTGRES_DB: mcp_nocode_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  mongo:
-    image: mongo:6.0
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    restart: always
     ports:
       - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - redis_data:/data
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/mcp_nocode_db
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    depends_on:
+      - db
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: arq worker.WorkerSettings
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/mcp_nocode_db
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    depends_on:
+      - db
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   postgres_data:
-  mongo_data:
-  redis_data:

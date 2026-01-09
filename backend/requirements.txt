@@ -43,3 +43,7 @@ google-cloud-core
 python-dateutil
 packaging
 mcp
+asyncpg
+arq
+asyncpg
+arq
