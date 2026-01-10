@@ -24,8 +24,8 @@ const ChatInput = ({ value, onChange, onSubmit, isLoading, disabled, placeholder
             <form
                 onSubmit={onSubmit}
                 className={`
-                    relative flex items-end p-2 bg-gray-800 border border-gray-600 rounded-3xl shadow-2xl transition-all duration-200
-                    focus-within:border-gray-500 focus-within:ring-1 focus-within:ring-gray-500/30
+                    relative flex items-end p-2 bg-[#0d1117] border border-gray-700/50 rounded-3xl shadow-xl transition-all duration-300
+                    focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:shadow-[0_0_20px_rgba(99,102,241,0.15)]
                     ${disabled ? 'opacity-70 cursor-not-allowed' : ''}
                 `}
             >

@@ -4,7 +4,7 @@ import { useDbStore } from 'stores/dbStore';
 import ChatMessage from 'components/chat/ChatMessage';
 import ChatInput from 'components/chat/ChatInput';
 import SessionList from 'components/chat/SessionList';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import { Bars3Icon, SparklesIcon } from '@heroicons/react/24/outline';
 
 const ChatbotPage = () => {
     const defaultMessage = {
@@ -343,10 +343,18 @@ const ChatbotPage = () => {
                         ))}
 
                         {isLoading && (
-                            <div className="py-6 flex justify-start animate-pulse">
-                                <div className="bg-gray-800/50 rounded-lg p-4 max-w-[80%] space-y-2">
-                                    <div className="h-2 bg-gray-700 rounded w-24"></div>
-                                    <div className="h-2 bg-gray-700 rounded w-48"></div>
+                            <div className="py-6 flex space-x-4 md:space-x-6 animate-in fade-in duration-300">
+                                <div className="flex-shrink-0">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center relative">
+                                        <div className="absolute inset-0 bg-emerald-500/20 animate-pulse rounded-lg" />
+                                        <SparklesIcon className="w-5 h-5 text-emerald-400 relative z-10" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-1 h-8">
+                                    <span className="text-sm text-emerald-500/80 font-mono tracking-wider">THINKING</span>
+                                    <span className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                    <span className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                    <span className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce"></span>
                                 </div>
                             </div>
                         )}

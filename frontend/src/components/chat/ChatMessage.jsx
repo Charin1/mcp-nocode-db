@@ -103,44 +103,65 @@ const QueryConfirmation = ({ query, onExecute, onCancel }) => {
     );
 };
 
+import { useTypewriter } from 'hooks/useTypewriter';
+
+const MessageContent = ({ content, isAnimated }) => {
+    const { displayedText, isComplete } = useTypewriter(content, 5, isAnimated);
+
+    return (
+        <div className="text-[15px] leading-relaxed text-gray-300">
+            <p className="whitespace-pre-wrap">
+                {displayedText}
+                {!isComplete && isAnimated && (
+                    <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-emerald-500 animate-pulse" />
+                )}
+            </p>
+        </div>
+    );
+};
+
 const ChatMessage = ({ message, onExecuteQuery, onVisualize, visibleCharts, chartConfig, isLast }) => {
     const isUser = message.role === 'user';
     const isAssistant = message.role === 'assistant';
+    // Only animate if it's the last message and it's from the assistant
+    const shouldAnimate = isAssistant && isLast;
 
     return (
-        <div className={`group flex space-x-4 md:space-x-6 py-6 ${!isLast ? 'border-b border-gray-800/50' : ''}`}>
+        <div className={`group flex space-x-4 md:space-x-6 py-6 ${!isLast ? 'border-b border-gray-800/50' : ''} animate-in fade-in duration-500`}>
             {/* Avatar */}
             <div className="flex-shrink-0">
                 {isUser ? (
-                    <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-900/20">
-                        {/* Placeholder for user avatar if available, else icon */}
-                        <UserCircleSolid className="w-6 h-6 text-white" />
+                    <div className="w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.2)]">
+                        <UserCircleIcon className="w-6 h-6 text-indigo-400" />
                     </div>
                 ) : (
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-900/20">
-                        <SparklesIcon className="w-5 h-5 text-white" />
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.15)] relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-50" />
+                        <SparklesIcon className="w-5 h-5 text-emerald-400 relative z-10" />
                     </div>
                 )}
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex-1 min-w-0 space-y-2">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-200">
-                        {isUser ? 'You' : 'No-Code DB AI'}
+                <div className="flex items-center space-x-2">
+                    <h3 className={`text-sm font-semibold tracking-wide ${isUser ? 'text-indigo-400' : 'text-emerald-400'}`}>
+                        {isUser ? 'You' : 'AI Assistant'}
                     </h3>
-                    {isUser && (
-                        <button className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-gray-300 transition-opacity">
-                            <PencilSquareIcon className="w-4 h-4" />
-                        </button>
-                    )}
+                    <span className="text-xs text-gray-600 px-1.5 py-0.5 rounded border border-gray-800 bg-gray-900/50 uppercase tracking-wider font-mono">
+                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                 </div>
 
                 {/* Body */}
-                <div className={`text-[15px] leading-relaxed ${isUser ? 'text-gray-100 font-medium' : 'text-gray-300'}`}>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                </div>
+                {isUser ? (
+                    <div className="text-[15px] leading-relaxed text-gray-100 font-medium bg-gray-800/40 p-3 rounded-r-xl rounded-bl-xl border border-gray-700/50 inline-block">
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                    </div>
+                ) : (
+                    <MessageContent content={message.content} isAnimated={shouldAnimate} />
+                )}
 
                 {/* Interactive Elements (Query/Results) */}
                 {message.query && (
