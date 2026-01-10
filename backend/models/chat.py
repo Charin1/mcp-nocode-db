@@ -1,14 +1,16 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Any, Dict, Literal
 from datetime import datetime
 
 class ChatSession(BaseModel):
     id: int
-    user_id: str  # We store email/username as ID in this system currently
+    user_id: str
     db_id: str
     title: Optional[str] = "New Chat"
     project_id: Optional[int] = None
-    created_at: str
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class ChatMessageDB(BaseModel):
     id: int
@@ -17,7 +19,9 @@ class ChatMessageDB(BaseModel):
     content: str
     query: Optional[str] = None
     chart_config: Optional[Dict[str, Any]] = None
-    created_at: str
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class CreateSessionRequest(BaseModel):
     db_id: str
@@ -28,7 +32,9 @@ class Project(BaseModel):
     id: int
     user_id: str
     name: str
-    created_at: str
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class CreateProjectRequest(BaseModel):
     name: str

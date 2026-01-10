@@ -47,3 +47,5 @@ asyncpg
 arq
 asyncpg
 arq
+arq
+tenacity

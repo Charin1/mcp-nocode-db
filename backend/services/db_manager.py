@@ -6,6 +6,7 @@ from services.connectors.postgres_connector import PostgresConnector
 from services.connectors.mongo_connector import MongoConnector
 from services.connectors.redis_connector import RedisConnector
 from services.connectors.mysql_connector import MySqlConnector
+from services.connectors.sqlite_connector import SQLiteConnector
 # from services.connectors.elasticsearch_connector import ElasticsearchConnector
 # from services.connectors.bigquery_connector import BigQueryConnector
 from models.database import AppConfig, DBConnection
@@ -38,6 +39,8 @@ class DbManager:
                 self._connectors[db_id] = MongoConnector(db_info)
             elif engine == "redis":
                 self._connectors[db_id] = RedisConnector(db_info)
+            elif engine == "sqlite":
+                self._connectors[db_id] = SQLiteConnector(db_info)
             # elif engine == "elasticsearch":
             #     self._connectors[db_id] = ElasticsearchConnector(db_info)
             # elif engine == "bigquery":

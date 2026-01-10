@@ -11,6 +11,8 @@ from routers import auth, database, query, admin, chatbot, saved_query
 from mcp_server import mcp
 from services.audit_service import AuditService
 from services.security import get_current_user, has_role, create_initial_admin_user
+from db.session import engine, Base
+from db import models # Register models
 
 
 app = FastAPI(
@@ -40,7 +42,8 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """Initializes services and creates the first admin user if none exist."""
-    AuditService.initialize()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     create_initial_admin_user()
 
 

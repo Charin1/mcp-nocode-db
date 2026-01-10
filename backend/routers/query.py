@@ -5,13 +5,17 @@ from services.security import get_current_user, has_role
 from services.db_manager import DbManager
 from services.llm_service import LLMService
 from services.audit_service import AuditService
+from db.session import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
 
 @router.post("/query/generate", response_model=GeneratedQuery)
 async def generate_query_from_nl(
-    request: QueryRequest, current_user: User = Depends(get_current_user)
+    request: QueryRequest, 
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Takes a natural language query and returns a generated raw query (SQL, Mongo JSON, etc.)
@@ -19,6 +23,7 @@ async def generate_query_from_nl(
     """
     db_manager = DbManager()
     llm_service = LLMService()
+    audit_service = AuditService(db)
 
     try:
         schema_for_prompt = await db_manager.get_schema_for_prompt(request.db_id)
@@ -31,7 +36,7 @@ async def generate_query_from_nl(
             engine=db_engine,
         )
 
-        AuditService.log(
+        await audit_service.log(
             username=current_user.username,
             db_id=request.db_id,
             natural_query=request.natural_language_query,
@@ -45,7 +50,7 @@ async def generate_query_from_nl(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        AuditService.log(
+        await audit_service.log(
             username=current_user.username,
             db_id=request.db_id,
             natural_query=request.natural_language_query,
@@ -58,13 +63,16 @@ async def generate_query_from_nl(
 
 @router.post("/query/execute", response_model=QueryResult)
 async def execute_raw_query(
-    request: QueryRequest, current_user: User = Depends(get_current_user)
+    request: QueryRequest, 
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Executes a raw query against the specified database.
     Includes safety checks for mutations.
     """
     db_manager = DbManager()
+    audit_service = AuditService(db)
 
     db_config = db_manager.get_db_config(request.db_id)
     if not db_config:
@@ -94,7 +102,7 @@ async def execute_raw_query(
     try:
         result = await db_manager.execute_query(request.db_id, request.raw_query)
 
-        AuditService.log(
+        await audit_service.log(
             username=current_user.username,
             db_id=request.db_id,
             natural_query=request.natural_language_query,
@@ -106,7 +114,7 @@ async def execute_raw_query(
         return QueryResult(**result, query_executed=request.raw_query)
 
     except Exception as e:
-        AuditService.log(
+        await audit_service.log(
             username=current_user.username,
             db_id=request.db_id,
             natural_query=request.natural_language_query,

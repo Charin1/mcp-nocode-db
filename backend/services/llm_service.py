@@ -5,6 +5,7 @@ from groq import AsyncGroq
 import yaml
 import json
 from typing import List
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from models.query import GeneratedQuery, ChatMessage
 
@@ -69,7 +70,6 @@ class LLMService:
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
-        # --- FIX: Pass the 'engine' to the parser ---
         response = self._parse_chat_response(raw_response, engine)
 
         if last_user_message:
@@ -80,7 +80,6 @@ class LLMService:
         return response
 
     def _build_prompt(self, nl_query: str, schema: str, engine: str) -> str:
-        # This function is already correct from our previous fix.
         if engine in ["postgresql", "mysql", "sqlite"]:
             return f"""
                 Your task is to convert a natural language query into a valid, safe, and parameterized SQL query for a {engine} database.
@@ -142,7 +141,6 @@ class LLMService:
     ) -> str:
         history = "\n".join([f"{m.role}: {m.content}" for m in messages])
 
-        # --- FIX: Make the prompt dynamically adapt to the database engine ---
         if engine in ["postgresql", "mysql", "sqlite"]:
             query_language = "SQL query"
             query_block_tag = "sql"
@@ -173,7 +171,6 @@ class LLMService:
             """
 
     def _build_chat_system_prompt(self, schema: str, engine: str) -> str:
-        # --- FIX: Make the prompt dynamically adapt to the database engine ---
         if engine in ["postgresql", "mysql", "sqlite"]:
             query_language = "SQL query"
             query_block_tag = "sql"
@@ -200,6 +197,7 @@ class LLMService:
             {schema}
             """
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_with_gemini(self, prompt: str, engine: str) -> GeneratedQuery:
         try:
             model_name = self.config["providers"]["gemini"]["model"]
@@ -223,10 +221,10 @@ class LLMService:
             )
             return self._parse_llm_response(cleaned_text, engine)
         except Exception as e:
-            return GeneratedQuery(
-                raw_query="", error=f"Error from Gemini API: {e}", query_type=engine
-            )
+            # Raise for retry unless it's a fatal error? For simplicity retry all exceptions for now
+            raise e
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_with_chatgpt(self, prompt: str, engine: str) -> GeneratedQuery:
         if not self.openai_client:
             return GeneratedQuery(
@@ -249,10 +247,9 @@ class LLMService:
             raw_text = response.choices[0].message.content.strip()
             return self._parse_llm_response(raw_text, engine)
         except Exception as e:
-            return GeneratedQuery(
-                raw_query="", error=f"Error from OpenAI API: {e}", query_type=engine
-            )
+            raise e
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_with_groq(self, prompt: str, engine: str) -> GeneratedQuery:
         if not self.groq_client:
             return GeneratedQuery(
@@ -275,32 +272,22 @@ class LLMService:
             raw_text = response.choices[0].message.content.strip()
             return self._parse_llm_response(raw_text, engine)
         except Exception as e:
-            return GeneratedQuery(
-                raw_query="", error=f"Error from Groq API: {e}", query_type=engine
-            )
+            raise e
 
     def _parse_llm_response(self, text: str, engine: str) -> GeneratedQuery:
-        print(f"DEBUG: Raw LLM Response: {repr(text)}") # Log raw headers/newlines
+        print(f"DEBUG: Raw LLM Response: {repr(text)}") 
 
         if engine in ["postgresql", "mysql", "sqlite"]:
-            # Use regex to find separator flexibly (handling newlines/spaces)
             import re
             separator_pattern = r"-+\s*JSON\s*-+"
             split = re.split(separator_pattern, text, maxsplit=1, flags=re.IGNORECASE)
             
-            print(f"DEBUG: Regex Split Length: {len(split)}")
-
             if len(split) == 2:
                 sql_part = split[0].strip()
                 json_part = split[1].strip()
                 
-                print(f"DEBUG: SQL Part: {repr(sql_part)}")
-                print(f"DEBUG: JSON Part: {repr(json_part)}")
-
-                # Remove code blocks if present
                 sql_part = re.sub(r"^```sql\s*", "", sql_part, flags=re.IGNORECASE)
                 sql_part = re.sub(r"```$", "", sql_part).strip()
-                # Clean json part just in case
                 json_part = re.sub(r"^```json\s*", "", json_part, flags=re.IGNORECASE)
                 json_part = re.sub(r"```$", "", json_part).strip()
                 
@@ -316,10 +303,8 @@ class LLMService:
                         query_type="sql",
                     )
             else:
-                 # Fallback: If no separator, assume entire text is SQL if it looks like SQL
                  cleaned_text = re.sub(r"^```sql\s*", "", text, flags=re.IGNORECASE)
                  cleaned_text = re.sub(r"```$", "", cleaned_text).strip()
-                 # If it doesn't have parameters (indicated by :param), we can accept it
                  if ":" not in cleaned_text: 
                      return GeneratedQuery(
                         raw_query=cleaned_text,
@@ -346,6 +331,7 @@ class LLMService:
         else:
             return GeneratedQuery(raw_query=text, query_type=engine)
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_chat_with_gemini(self, prompt: str) -> str:
         try:
             model_name = self.config["providers"]["gemini"]["model"]
@@ -356,8 +342,9 @@ class LLMService:
             else:
                 return "Error from Gemini API: Received an empty or blocked response."
         except Exception as e:
-            return f"Error from Gemini API: {e}"
+            raise e
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_chat_with_chatgpt(
         self, system_prompt: str, messages: List[ChatMessage]
     ) -> str:
@@ -365,7 +352,6 @@ class LLMService:
              return "Error: OpenAI API key not configured."
         try:
             model_name = self.config["providers"]["chatgpt"]["model"]
-            # Sanitize to only include role and content (APIs don't accept extra fields)
             formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
             response = self.openai_client.chat.completions.create(
                 model=model_name,
@@ -376,9 +362,9 @@ class LLMService:
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"Error calling OpenAI: {e}")
-            return "Sorry, I encountered an error trying to generate a response."
+            raise e
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_chat_with_groq(
         self, system_prompt: str, messages: List[ChatMessage]
     ) -> str:
@@ -386,7 +372,6 @@ class LLMService:
              return "Error: Groq API key not configured."
         try:
             model_name = self.config["providers"]["groq"]["model"]
-            # Sanitize to only include role and content (APIs don't accept extra fields)
             formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
             response = await self.groq_client.chat.completions.create(
                 model=model_name,
@@ -397,8 +382,7 @@ class LLMService:
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"Error calling Groq: {e}")
-            return "Sorry, I encountered an error trying to generate a response."
+            raise e
 
     def _parse_chat_response(self, text: str, engine: str) -> ChatMessage:
         import re
@@ -410,8 +394,6 @@ class LLMService:
         else:
             query_block_tag = "text"
 
-        # Try to extract query from code block using regex (handles extra text around block)
-        # Pattern matches ```sql ... ``` or ```redis ... ``` even with surrounding text
         pattern = rf"```{query_block_tag}\s*([\s\S]*?)```"
         match = re.search(pattern, text, re.IGNORECASE)
         
@@ -423,13 +405,11 @@ class LLMService:
                 query=query,
             )
         
-        # Fallback: Try generic code block pattern (```...```)
         generic_pattern = r"```\s*([\s\S]*?)```"
         generic_match = re.search(generic_pattern, text)
         
         if generic_match:
             potential_query = generic_match.group(1).strip()
-            # Check if it looks like a SQL query (starts with common SQL keywords)
             sql_keywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "WITH", "CREATE", "ALTER", "DROP", "SHOW", "DESCRIBE"]
             if any(potential_query.upper().startswith(kw) for kw in sql_keywords):
                 return ChatMessage(
@@ -437,7 +417,6 @@ class LLMService:
                     content="I have generated a query for you. Please review and confirm if you would like to execute it.",
                     query=potential_query,
                 )
-            # Check if it looks like a Redis command
             redis_keywords = ["GET", "SET", "HGETALL", "HGET", "HSET", "KEYS", "SCAN", "DEL", "LPUSH", "RPUSH", "LRANGE"]
             if any(potential_query.upper().startswith(kw) for kw in redis_keywords):
                 return ChatMessage(
@@ -446,8 +425,6 @@ class LLMService:
                     query=potential_query,
                 )
         
-        # Last fallback: Look for SQL-like patterns without code blocks
-        # This handles cases where LLM forgets to use code blocks
         sql_pattern = r"(?:^|\n)(SELECT\s+[\s\S]*?(?:;|$))"
         sql_match = re.search(sql_pattern, text, re.IGNORECASE)
         if sql_match and engine in ["postgresql", "mysql", "sqlite"]:
@@ -458,5 +435,4 @@ class LLMService:
                 query=query,
             )
         
-        # If no query block is found, return the text as a simple chat message
         return ChatMessage(role="assistant", content=text)

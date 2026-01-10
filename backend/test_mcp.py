@@ -35,7 +35,7 @@ async def run_test():
                 # The original test used 'postgres'.
                 # Let's try 'postgres_docker' as per config.
                 
-                db_id = "postgres_docker"
+                db_id = "sqlite"
                 try:
                     result = await session.call_tool("list_tables", arguments={"db_id": db_id})
                     print("Result:", result.content)

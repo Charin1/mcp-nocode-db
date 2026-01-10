@@ -12,6 +12,12 @@ databases:
     dbname: "sampledb"
     allow_mutations: true # Set to true for admin testing
 
+  sqlite:
+    name: "SQLite (Local)"
+    engine: "sqlite"
+    path: "mcp_nocode_db.db"
+    allow_mutations: true
+
   # mongo_docker:
   #   name: "MongoDB (Docker)"
   #   engine: "mongodb"

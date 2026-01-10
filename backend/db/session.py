@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 # Default to localhost for running without docker if env not set, but prefer env
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/mcp_nocode_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./mcp_nocode_db.db")
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 
