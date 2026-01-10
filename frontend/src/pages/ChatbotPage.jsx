@@ -40,7 +40,7 @@ const ChatbotPage = () => {
 
     // Scroll to bottom when messages change
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, [messages, isLoading]);
 
     // --- API Interactions ---
@@ -329,7 +329,7 @@ const ChatbotPage = () => {
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto w-full scroll-smooth">
-                    <div className="max-w-4xl mx-auto px-4 pt-6 pb-32">
+                    <div className="max-w-4xl mx-auto px-4 pt-6 pb-40">
                         {messages.map((msg, index) => (
                             <ChatMessage
                                 key={index}
