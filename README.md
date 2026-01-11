@@ -4,202 +4,136 @@
 
 ⚠️ This project is currently in **beta**. While it is more stable than earlier development versions, it may still contain bugs and is **not yet production-ready**.
 
-
-MCP No-Code DB is a modern, web-based database tool that allows users to connect to their database and interact with it using either natural language or raw queries. It leverages Large Language Models (LLMs) like Google's Gemini to translate plain English questions into executable SQL queries, providing a powerful and intuitive interface for data exploration.
-
-While the platform is designed to be a **M**ulti-**C**onnection **P**latform, the current version supports **PostgreSQL**, **MongoDB**, and **Redis**.
+MCP No-Code DB is a modern, web-based database tool that allows users to connect to their database and interact with it using either natural language or raw queries. It leverages Large Language Models (LLMs) like Google's Gemini, OpenAI, and Groq to translate plain English questions into executable SQL queries, providing a powerful and intuitive interface for data exploration.
 
 ---
 
 ## 📸 How It Works: A Visual Walkthrough
 
-See the application in action in three simple steps.
-
 ### Step 1: Ask a Question in Natural Language
-The workflow begins by asking a question about your data in plain English. The UI is designed to be simple and intuitive. After typing your question, you click "Generate Query" to have the AI process your request.
+The workflow begins by asking a question about your data in plain English. The interface features a professional, AI-native design with real-time "thinking" animations and typewriter effects.
 
+### Step 2: Review & Execute
+The application uses the selected LLM to translate your question into a precise SQL query. You can review the query and execute it with a single click.
 
-![Step 1: Write a Natural Language Query](./docs/images/step1.png)
-
-### Step 2: Review the AI-Generated SQL
-The application uses the selected LLM to translate your question into a precise SQL query. The UI automatically switches to the "Raw Query" tab, displaying the generated SQL for your review and approval. This ensures you have full control and can verify the query before it runs.
-
-
-![Step 2: Review the Generated SQL](./docs/images/step2.png)
-
-### Step 3: Execute and View the Results
-With the generated query confirmed, you click "Execute." The backend runs the query against your database, and the results are instantly displayed in a clean, interactive, and paginated table in the results panel below.
-
-
-![Step 3: View the Query Results](./docs/images/step3.png)
-
----
-
-## 🤖 How It Works: The Chatbot
-
-For a more interactive experience, the chatbot allows for a continuous conversation about your data.
-
-### Step 1: Start the Conversation
-Switch to the "Chatbot" tab and ask a question in plain English. The chatbot will understand your query in the context of your conversation.
-
-![Step 1: Ask a question in the chat](./docs/images/chatbot_step1.png)
-
-### Step 2: Confirm the Generated Query
-The chatbot will generate the appropriate SQL and ask for your confirmation before running it, ensuring you always have control.
-
-![Step 2: Confirm the generated query](./docs/images/chatbot_step2.png)
-
-### Step 3: View Results and Ask Follow-up Questions
-Results are displayed directly in the chat. You can then ask follow-up questions, and the chatbot will use the conversation history to understand the context.
-
-![Step 3: View results and ask follow-up questions](./docs/images/chatbot_step3.png)
+### Step 3: Interactive Chat
+For a more conversational experience, the **Chatbot** allows continuous dialogue about your data. It understands context, remembers history, and can visualize results.
 
 ---
 
 ## ✨ Features
 
-*   **Database Connectivity:** Connect seamlessly to **PostgreSQL**, **MongoDB**, and **Redis**.
-*   **Dual Query Modes:**
-    *   **Natural Language Query:** Ask questions in plain English and have an AI generate the SQL, MongoDB, or Redis query for you.
-    *   **Raw Query Editor:** A powerful editor with syntax highlighting for writing and executing queries directly.
-*   **Conversational Chatbot:** An intuitive chat interface to ask questions, get generated queries for confirmation, and see results, all within a continuous conversation.
-*   **Saved Queries:** Save your favorite or complex queries to re-run them later with a single click.
-*   **AI-Powered:** Integrated with **Google Gemini**, **OpenAI (ChatGPT)**, and **Groq (Llama 3)** to power the natural language-to-query functionality.
-*   **Schema Explorer:** Automatically discovers and displays the tables and columns of the connected PostgreSQL database.
-*   **Secure by Default:**
-    *   JWT-based authentication for secure user sessions.
-    *   Role-Based Access Control (RBAC), with the first registered user becoming an `admin`.
-    *   Read-only operations by default to prevent accidental data mutations.
-*   **Interactive Results:** View query results in a sortable, paginated data table.
-*   **Comprehensive Auditing:** All query generations and executions are logged for security and review.
+*   **Multi-Database Support:**
+    *   Connect to **PostgreSQL**, **MySQL**, **MongoDB**, **Redis**, **SQLite**, **Elasticsearch**, and **BigQuery**.
+    *   Flexible architecture allows connection to both local and remote databases (Docker containers, cloud services, or local instances).
+*   **Reliable Backend:**
+    *   **SQLAlchemy ORM:** Robust database interactions and migration support.
+    *   **Background Workers:** Uses `arq` (Redis) for reliable task processing (optional).
+    *   **Smart Retries:** `Tenacity` integration ensures resilience against API flakes.
+*   **Modern UI/UX:**
+    *   **AI-Native Feel:** "Thinking" animations, typewriter effects, and glassmorphism styling.
+    *   **Visualization:** Auto-generate charts from your data.
+*   **Secure by Default:** JWT-based authentication and Role-Based Access Control (RBAC).
 
 ---
 
 ## 🔌 MCP Integration
 
-This project implements the **Model Context Protocol (MCP)**, allowing AI assistants (like Claude Desktop or other MCP clients) to directly discover and interact with your database schema and data.
+This project implements the **Model Context Protocol (MCP)**, allowing AI assistants (like Claude Desktop) to discover and interact with your database schema and data.
 
 ### Available Tools
-
 *   `list_tables(db_id: str)`: Lists all tables in the specified database.
-*   `get_schema(db_id: str)`: Returns the full schema (tables and columns) for the database.
+*   `get_schema(db_id: str)`: Returns the full schema for the database.
 *   `execute_query(db_id: str, query: str)`: Executes a raw SQL query safely.
-
-### Available Resources
-
-*   `postgres://{db_id}/schema`: Provides the database schema as a formatted text resource.
-
-### Connecting an MCP Client
-
-The MCP server runs over **Server-Sent Events (SSE)**.
-*   **SSE Endpoint:** `http://localhost:8000/api/mcp/sse`
-
----
-
-## 💻 Tech Stack
-
-This project is a modern full-stack application built with:
-
-*   **Backend:**
-    *   **Framework:** **Python 3.13+** with **FastAPI**
-    *   **Validation:** **Pydantic**
-    *   **Authentication:** **Passlib** and **python-jose**
-    *   **Database Drivers:** `psycopg2` (PostgreSQL), `motor` (MongoDB), `redis` (Redis)
-    *   **AI Integration:** `google-generativeai`, `openai`, and `groq` SDKs
-    *   **MCP:** `mcp` and `fastmcp` for Model Context Protocol integration
-*   **Frontend:**
-    *   **Framework:** **React 18** with **Vite**
-    *   **Styling:** **TailwindCSS**
-    *   **State Management:** **Zustand**
-    *   **API Communication:** **Axios**
-*   **DevOps & Infrastructure:**
-    *   **Containerization:** **Docker** and **Docker Compose**
 
 ---
 
 ## 🚀 Getting Started
 
-Follow these instructions to get the application running locally.
+You can run the application locally or via Docker, connecting to any supported database.
 
-### Prerequisites
+### 1. Installation & Setup
 
-*   **Docker & Docker Compose:** [Install Docker Desktop](https://www.docker.com/products/docker-desktop/).
-*   **Python 3.13+** and a package manager like `pip` or `uv`.
-*   **Node.js 18+** and `npm`.
-*   **API Keys:** You must have API keys for Google AI (Gemini) and/or OpenAI.
-
-### 1. Clone the Repository
-
+**Clone the Repository**
 ```bash
 git clone <your-repository-url>
 cd mcp-nocode-db
 ```
 
-### 2. Configure Environment Variables
+**Backend Setup**
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-1.  Navigate to the `backend/` directory.
-2.  Create a file named `.env`.
-3.  Open `backend/.env` and add your secret keys:
+# Configure Environment
+cp .env.example .env
+# Add your API keys (GOOGLE_API_KEY, OPENAI_API_KEY, etc.) inside .env
+```
 
-    ```ini
-    # For LLM Services
-    GOOGLE_API_KEY="your_google_api_key_here"
-    OPENAI_API_KEY="your_openai_api_key_here"
-    GROQ_API_KEY="your_groq_api_key_here"
+**Frontend Setup**
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-    # For JWT Authentication
-    SECRET_KEY="a_very_secret_key_for_jwt_tokens_change_me"
-    ALGORITHM="HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES=60
+### 2. Configuration & Database Connection
+
+The application is database-agnostic. You configure your connections in `backend/config/config.yaml`.
+
+**To switch databases:**
+1.  Open `backend/config/config.yaml`.
+2.  Enable the database you want to use (uncomment the relevant section) or add your own connection details.
+3.  The request payload determines which database ID to use, or you can set a default in your application logic.
+
+**Example Configurations:**
+
+*   **SQLite (Default)**: Zero-config, runs locally.
+*   **PostgreSQL**:
+    ```yaml
+    postgres_docker:
+      name: "Postgres (Docker)"
+      engine: "postgresql"
+      host: "localhost"
+      port: 5432
+      user: "postgres"
+      password: "mlp123"
+      dbname: "sampledb"
     ```
+*   **MongoDB, Redis, MySQL, BigQuery**: Uncomment the examples in `config.yaml` to enable.
 
-4.  **Configure Databases & LLM:**
-    *   The application uses a configuration file at `backend/config/config.yaml`.
-    *   This file defines your database connections (Postgres, Mongo, Redis) and selects your active LLM provider.
-    *   **Review and update** `backend/config/config.yaml` to match your local or docker environment.
+### 3. Running the Server
 
-### 3. Build and Run with Docker Compose
+Start the backend server (ensure your target database is running if it's external):
 
-From the **root directory** of the project, run:
+```bash
+# In backend directory
+uvicorn main:app --reload
+```
 
+Or run everything with Docker (if you prefer containerized services for Postgres/Redis):
 ```bash
 docker-compose up --build
 ```
-This command starts the frontend, backend, and a PostgreSQL database.
-*   Backend will be available at `http://localhost:8000`.
-*   Frontend will be available at `http://localhost:5173`.
-
-*(Note: The Docker Compose file defines PostgreSQL, MongoDB, and Redis services. Configure them in `backend/config/config.yaml` to use them.)*
-
-### 4. Seed the Database
-
-Once the containers are running, open a **new terminal** and run the following command to populate the PostgreSQL database with sample data.
-
-```bash
-docker exec -i mcp-nocode-db-postgres-1 psql -U admin -d maindb < backend/seed_data/postgres_seed.sql
-```
-*(Note: Your container name might be slightly different. Use `docker ps` to verify.)*
-
-### 5. Access the Application
-
-You're all set!
-
-*   **Open your browser and navigate to:** [**http://localhost:5173**](http://localhost:5173)
-*   **Log in:** A default admin user is created on first launch. Use these credentials:
-    *   **Email:** `admin@example.com`
-    *   **Password:** `password`
 
 ---
 
-## 🛠️ TODO & Future Enhancements
+## 💻 Tech Stack
 
-This project is a strong foundation. Future improvements could include:
+*   **Backend:** Python 3.13+, FastAPI, SQLAlchemy (Async), Pydantic, Arq (Redis), Tenacity
+*   **Frontend:** React 18, Vite, TailwindCSS, Zustand, Framer Motion (styled)
+*   **AI:** Google Gemini, OpenAI, Groq
+*   **Protocol:** Model Context Protocol (MCP)
+
+---
+
+## 🛠️ Roadmap
+
 *   [x] **Enable Multi-Database Support:** Support for MongoDB and Redis.
-*   [x] **Saved Queries:** Implement the UI and API endpoints to save and re-run frequently used queries.
-*   [ ] **Modal Windows:** Create dedicated modal windows for a deep-dive view of a specific table.
-*   [ ] **Advanced RBAC:** Implement more granular permissions (e.g., access per database, per role).
+*   [x] **Local SQLite Support:** Run without Docker.
+*   [x] **Backend Refactoring:** Adopt SQLAlchemy & Dependency Injection.
+*   [x] **Visual Enhancements:** Professional "AI" look and feel.
 *   [ ] **Production Hardening:** Move secrets to a secure vault.
-*   [ ] **Data Visualizations:** Add a simple charting feature to visualize results.
-
-## Status
-This project is still in its early stages. Expect breaking changes.
+*   [ ] **Advanced Data Visualizations:** More chart types.
