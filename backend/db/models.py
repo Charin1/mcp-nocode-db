@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.session import Base
 import datetime
+from models.mcp_connection import MCPConnection
 
 class Project(Base):
     __tablename__ = "projects"

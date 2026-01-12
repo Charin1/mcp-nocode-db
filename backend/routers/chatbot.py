@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.mcp_client import McpClientService
 
 from models.auth import User
 from models.query import ChatRequest, ChatMessage
@@ -181,6 +183,7 @@ async def send_message(
     session_id: int, 
     message: ChatMessage, 
     model_provider: str = "gemini",
+    active_mcp_ids: Optional[List[str]] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -195,6 +198,7 @@ async def send_message(
         
     llm_service = LLMService()
     db_manager = DbManager()
+    mcp_client = McpClientService()
     
     try:
         # 2. Save User Message
@@ -204,39 +208,163 @@ async def send_message(
             content=message.content
         )
         
-        # 3. Retrieve Context (All messages for now, could apply limit)
-        db_messages = await chat_service.get_session_messages(session_id=session_id)
-        
-        # Convert DB messages to ChatMessage objects for LLM service
-        context_messages = []
-        for db_msg in db_messages:
-            context_messages.append(ChatMessage(
-                role=db_msg.role,
-                content=db_msg.content,
-                query=db_msg.query
-            ))
+        # 3. Fetch Active MCP Tools
+        tools = []
+        active_connections = []
+        if active_mcp_ids:
+            # Parse IDs if they came as a single comma-separated string (frontend quirk handling)
+            # But normally List[str] handling depends on client. We'll assume List.
+            # Handle potential case where it's a single string of comma separated values
+            ids_to_fetch = []
+            for id_val in active_mcp_ids:
+                if "," in id_val:
+                    ids_to_fetch.extend(id_val.split(","))
+                else:
+                    ids_to_fetch.append(id_val)
             
-        # 4. Generate Response
-        schema = await db_manager.get_schema_for_prompt(session.db_id)
-        db_engine = db_manager.get_db_engine(session.db_id)
+            # Fetch connections from DB
+            from models.mcp_connection import MCPConnection
+            from sqlalchemy.future import select
+            
+            stmt = select(MCPConnection).where(MCPConnection.id.in_(ids_to_fetch), MCPConnection.user_id == current_user.username)
+            result = await db.execute(stmt)
+            active_connections = result.scalars().all()
+            
+            for conn in active_connections:
+                try:
+                    conn_tools = await mcp_client.get_tools(url=conn.url, headers=conn.headers)
+                    # Namespace tools to avoid collision? For now, raw.
+                    tools.extend(conn_tools)
+                except Exception as e:
+                    print(f"Failed to fetch tools from {conn.name}: {e}")
+
+        # 4. ReAct Loop (Max depth 5)
+        max_turns = 5
+        current_turn = 0
+        final_response_message = None
         
-        response_message = await llm_service.generate_response_from_messages(
-            db_id=session.db_id,
-            provider=model_provider,
-            messages=context_messages,
-            schema=schema,
-            engine=db_engine,
-        )
+        while current_turn < max_turns:
+            current_turn += 1
+            
+            # Retrieve Context (Refresh each turn as we might add tool outputs)
+            db_messages = await chat_service.get_session_messages(session_id=session_id)
+            context_messages = []
+            for db_msg in db_messages:
+                context_messages.append(ChatMessage(
+                    role=db_msg.role,
+                    content=db_msg.content,
+                    query=db_msg.query
+                ))
+                
+            schema = await db_manager.get_schema_for_prompt(session.db_id)
+            db_engine = db_manager.get_db_engine(session.db_id)
+            
+            # Generate Response
+            response_message = await llm_service.generate_response_from_messages(
+                db_id=session.db_id,
+                provider=model_provider,
+                messages=context_messages,
+                schema=schema,
+                engine=db_engine,
+                tools=tools if tools else None
+            )
+            
+            if response_message.query and response_message.query.startswith("__TOOL_CALL__:"):
+                # It's a tool call
+                import json
+                try:
+                    payload = json.loads(response_message.query[len("__TOOL_CALL__:") :])
+                    tool_name = payload["tool"]
+                    tool_args = payload["args"]
+                    
+                    # Save the "Thought/Action" from assistant
+                    await chat_service.add_message(
+                        session_id=session_id,
+                        role="assistant",
+                        content=response_message.content,
+                        query=f"Executing tool: {tool_name}"
+                    )
+                    
+                    # Find which connection has this tool
+                    # Naively search all active connections.
+                    # Ideally we should map tools to connections earlier.
+                    # We'll try all connections that have this tool.
+                    tool_result = f"Error: Tool {tool_name} not found or failed execution."
+                    
+                    for conn in active_connections:
+                        # Optimization: we could store a map of tool->conn
+                        # For now, just try to call it on the active connections
+                        # But wait, call_tool requires knowing which connection.
+                        # Using 'get_tools' again is expensive.
+                        # Let's assume unique tool names or try all.
+                         try:
+                             # We'll just try calling it. If it fails (404/method not found), continue.
+                             # But `call_tool` implementation expects us to know the URL.
+                             # Let's try to call it.
+                             # TODO: Improve efficient tool routing.
+                             res = await mcp_client.call_tool(
+                                 url=conn.url, 
+                                 tool_name=tool_name, 
+                                 arguments=tool_args, 
+                                 headers=conn.headers
+                             )
+                             tool_result = f"Tool Output: {res}"
+                             break # Success
+                         except:
+                             continue
+                    
+                    # Save Tool Result as User message (or System? Standard ReAct uses Observation)
+                    # But ChatMessage model supports 'user' and 'assistant'. 
+                    # We'll use 'user' with a specific prefix so LLM knows it's an observation.
+                    await chat_service.add_message(
+                        session_id=session_id,
+                        role="user",
+                        content=f"Observation: {tool_result}"
+                    )
+                    
+                    # Loop continues to next iteration to let LLM process observation
+                    continue
+                    
+                except Exception as e:
+                    # Tool parsing/execution failed
+                    await chat_service.add_message(
+                        session_id=session_id,
+                        role="user",
+                        content=f"Observation: Error executing tool: {str(e)}"
+                    )
+                    continue
+            else:
+                # Final response (or just a question/SQL query)
+                final_response_message = response_message
+                break
         
-        # 5. Save Assistant Response
+        if not final_response_message:
+            final_response_message = ChatMessage(role="assistant", content="I stopped processing after too many tool calls.")
+            
+        # 5. Save Final Assistant Response
         saved_response = await chat_service.add_message(
             session_id=session_id,
-            role=response_message.role,
-            content=response_message.content,
-            query=response_message.query
+            role=final_response_message.role,
+            content=final_response_message.content,
+            query=final_response_message.query
         )
         
-        # Return the saved assistant message as a list
+        # Return the saved assistant message as a list (might need to return the whole chain? 
+        # The frontend likely polls or appends. 
+        # We should return at least the final one. 
+        # If we added intermediate messages, the frontend might miss them if it only expects the return of this call.
+        # But `add_message` saves to DB, so if frontend re-fetches or we return all new messages...
+        # The current contract returns `List[ChatMessageDB]`.
+        # We should return ALL messages added during this turn.
+        # Let's fetch messages added after the user message.
+        # Or simpler: return the list of messages we added.
+        # Since we didn't track them explicitly in a list, we can just return a list containing the final one
+        # and assume frontend re-fetches. BUT standard chat UI expects the response to append.
+        # If we added 'Thought' messages, we might want to return them too.
+        # For now, let's just return the final one to keep it simple, or fetching the last N messages.
+        
+        # Actually, let's return the last message (final response).
+        # Intermediate steps are in DB history.
         return [saved_response]
 
     except Exception as e:

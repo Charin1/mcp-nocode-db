@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import apiClient from 'api/apiClient';
 import { useDbStore } from 'stores/dbStore';
+import { useMcpStore } from 'stores/mcpStore';
 import ChatMessage from 'components/chat/ChatMessage';
 import ChatInput from 'components/chat/ChatInput';
 import SessionList from 'components/chat/SessionList';
@@ -228,9 +229,22 @@ const ChatbotPage = () => {
         setIsLoading(true);
 
         try {
-            // Note: We use query param for model_provider as finalized in backend
+            // Construct query params
+            const params = new URLSearchParams();
+            params.append('model_provider', llmProvider || 'gemini');
+
+            // Add active MCP IDs
+            const activeMcpIds = useMcpStore.getState().activeConnectionIds;
+            if (activeMcpIds.length > 0) {
+                // Pass as comma-separated string or multiple params? Backend handles both via custom logic I wrote
+                // but let's send as multiple keys 'active_mcp_ids' is standard for FastAPI List[str] if using axios paramsSerializer
+                // But here we are constructing URL manually-ish.
+                // My backend logic: ids_to_fetch.extend(id_val.split(",")) handles comma separated.
+                params.append('active_mcp_ids', activeMcpIds.join(','));
+            }
+
             const res = await apiClient.post(
-                `/api/chatbot/sessions/${activeSessionId}/message?model_provider=${llmProvider || 'gemini'}`,
+                `/api/chatbot/sessions/${activeSessionId}/message?${params.toString()}`,
                 {
                     role: 'user',
                     content: userInput

@@ -8,6 +8,7 @@ import { AgGridReact } from 'ag-grid-react';
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import ChartVisualization from './ChartVisualization';
+import { useTypewriter } from '../../hooks/useTypewriter';
 
 const ChatResults = ({ results, onVisualize, showChart, chartConfig }) => {
     // Identify if it's a JSON result (Mongo/Redis) or Table result (SQL)
@@ -103,7 +104,7 @@ const QueryConfirmation = ({ query, onExecute, onCancel }) => {
     );
 };
 
-import { useTypewriter } from 'hooks/useTypewriter';
+
 
 const MessageContent = ({ content, isAnimated }) => {
     const { displayedText, isComplete } = useTypewriter(content, 5, isAnimated);

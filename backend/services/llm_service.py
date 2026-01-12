@@ -4,7 +4,7 @@ from openai import OpenAI
 from groq import AsyncGroq
 import yaml
 import json
-from typing import List
+from typing import List, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from models.query import GeneratedQuery, ChatMessage
@@ -48,31 +48,32 @@ class LLMService:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
     async def generate_response_from_messages(
-        self, db_id: str, provider: str, messages: List[ChatMessage], schema: str, engine: str
+        self, db_id: str, provider: str, messages: List[ChatMessage], schema: str, engine: str, tools: List[Dict[str, Any]] = None
     ) -> ChatMessage:
         last_user_message = next((m.content for m in reversed(messages) if m.role == 'user'), None)
 
-        if last_user_message:
+        # Skip caching if tools are involved, as context matters more
+        if last_user_message and not tools:
             cache_key = (db_id, last_user_message)
             if cache_key in self.cache:
                 print(f"Returning cached response for: {cache_key}")
                 return self.cache[cache_key]
 
         if provider.lower() == "gemini":
-            prompt = self._build_chat_prompt(messages, schema, engine)
+            prompt = self._build_chat_prompt(messages, schema, engine, tools)
             raw_response = await self._generate_chat_with_gemini(prompt)
         elif provider.lower() == "chatgpt":
-            system_prompt = self._build_chat_system_prompt(schema, engine)
+            system_prompt = self._build_chat_system_prompt(schema, engine, tools)
             raw_response = await self._generate_chat_with_chatgpt(system_prompt, messages)
         elif provider.lower() == "groq":
-            system_prompt = self._build_chat_system_prompt(schema, engine)
+            system_prompt = self._build_chat_system_prompt(schema, engine, tools)
             raw_response = await self._generate_chat_with_groq(system_prompt, messages)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
         response = self._parse_chat_response(raw_response, engine)
 
-        if last_user_message:
+        if last_user_message and not tools:
             cache_key = (db_id, last_user_message)
             print(f"Caching response for: {cache_key}")
             self.cache[cache_key] = response
@@ -137,9 +138,29 @@ class LLMService:
                 """
 
     def _build_chat_prompt(
-        self, messages: List[ChatMessage], schema: str, engine: str
+        self, messages: List[ChatMessage], schema: str, engine: str, tools: List[Dict[str, Any]] = None
     ) -> str:
         history = "\n".join([f"{m.role}: {m.content}" for m in messages])
+
+        tools_instruction = ""
+        if tools:
+            import json
+            tools_json = json.dumps(tools, indent=2)
+            tools_instruction = f"""
+            ### Available Tools
+            You have access to the following tools:
+            {tools_json}
+
+            To use a tool, you MUST use the following format:
+            Thought: Do I need to use a tool? Yes
+            Action: the name of the tool to use
+            Action Input: the input to the tool in JSON format
+            Observation: <leave this blank>
+            
+            When you have a final answer, or if you don't need to use a tool, use:
+            Thought: Do I need to use a tool? No
+            Final Answer: [your response here]
+            """
 
         if engine in ["postgresql", "mysql", "sqlite"]:
             query_language = "SQL query"
@@ -163,6 +184,7 @@ class LLMService:
             3.  If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
             4.  Use the provided conversation history for context.
 
+            {tools_instruction}
             ### Database Schema
             {schema}
             ### Conversation History
@@ -170,7 +192,7 @@ class LLMService:
             ### Your Response
             """
 
-    def _build_chat_system_prompt(self, schema: str, engine: str) -> str:
+    def _build_chat_system_prompt(self, schema: str, engine: str, tools: List[Dict[str, Any]] = None) -> str:
         if engine in ["postgresql", "mysql", "sqlite"]:
             query_language = "SQL query"
             query_block_tag = "sql"
@@ -180,6 +202,26 @@ class LLMService:
         else:
             query_language = f"{engine} query"
             query_block_tag = "text"
+
+        tools_instruction = ""
+        if tools:
+            import json
+            tools_json = json.dumps(tools, indent=2)
+            tools_instruction = f"""
+            ### Available Tools
+            You have access to the following tools:
+            {tools_json}
+
+            To use a tool, you MUST use the following format:
+            Thought: Do I need to use a tool? Yes
+            Action: the name of the tool to use
+            Action Input: the input to the tool in JSON format
+            Observation: <leave this blank>
+            
+            When you have a final answer, or if you don't need to use a tool, use:
+            Thought: Do I need to use a tool? No
+            Final Answer: [your response here]
+            """
 
         return f"""
             You are a helpful and friendly database assistant chatbot.
@@ -193,6 +235,7 @@ class LLMService:
             3.  If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
             4.  Use the provided conversation history for context.
 
+            {tools_instruction}
             ### Database Schema
             {schema}
             """
@@ -435,4 +478,27 @@ class LLMService:
                 query=query,
             )
         
+        # Check for ReAct pattern
+        react_pattern = r"Action:\s*(.*?)\nAction Input:\s*(\{.*?\})"
+        react_match = re.search(react_pattern, text, re.DOTALL)
+        if react_match:
+            tool_name = react_match.group(1).strip()
+            tool_input = react_match.group(2).strip()
+            try:
+                import json
+                tool_args = json.loads(tool_input)
+                # Return a special message indicating a tool call
+                # We reuse 'query' field for the tool call details or create a new way
+                # For now, let's format it as a special internal command so the router can pick it up
+                # Or better, we trust the router to inspect the content if we mark it?
+                # Let's use the 'query' field to store the tool call JSON for now
+                tool_call_payload = json.dumps({"tool": tool_name, "args": tool_args})
+                return ChatMessage(
+                    role="assistant",
+                    content=text,  # Keep the thought process
+                    query=f"__TOOL_CALL__:{tool_call_payload}"
+                )
+            except:
+                pass
+
         return ChatMessage(role="assistant", content=text)
