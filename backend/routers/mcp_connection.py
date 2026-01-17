@@ -14,15 +14,19 @@ router = APIRouter()
 # Pydantic models for request/response
 class MCPConnectionCreate(BaseModel):
     name: str
-    url: str
+    connection_type: str = "sse" # "sse" or "stdio"
+    url: str = None # Optional, for SSE backwards compatibility
+    configuration: Dict[str, Any] = {}
     headers: Dict[str, Any] = {}
 
 class MCPConnectionOut(BaseModel):
     id: int
     name: str
-    url: str
+    connection_type: str
+    url: str | None
+    configuration: Dict[str, Any]
     headers: Dict[str, Any]
-    created_at: Any # Using Any to avoid datetime serialization complexity for now
+    created_at: Any 
 
     class Config:
         from_attributes = True
@@ -34,10 +38,17 @@ async def create_mcp_connection(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new MCP connection for the current user."""
+    # Logic to populate configuration from deprecated fields if needed
+    config = connection.configuration
+    if connection.connection_type == "sse" and connection.url and not config.get("url"):
+        config["url"] = connection.url
+
     new_connection = MCPConnection(
         user_id=current_user.username,
         name=connection.name,
-        url=connection.url,
+        connection_type=connection.connection_type,
+        url=connection.url, # Keep storing it alongside config for now
+        configuration=config,
         headers=connection.headers
     )
     db.add(new_connection)

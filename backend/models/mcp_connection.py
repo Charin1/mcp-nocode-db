@@ -9,7 +9,12 @@ class MCPConnection(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=False) # Maps to User.username
     name = Column(String, nullable=False)
-    url = Column(String, nullable=False)
+    # connection_type: 'sse' or 'stdio'
+    connection_type = Column(String, default="sse", nullable=False) 
+    # url is deprecated but kept for compatibility, sync with configuration['url'] if type is sse
+    url = Column(String, nullable=True) 
+    # configuration: JSON blob for type-specific settings (e.g. command, args, env, or url)
+    configuration = Column(JSON, default={}) 
     headers = Column(JSON, default={})
     created_at = Column(DateTime, default=datetime.utcnow)
 

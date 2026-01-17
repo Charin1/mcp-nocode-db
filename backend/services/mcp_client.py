@@ -9,82 +9,139 @@ class McpClientService:
     def __init__(self):
         pass
 
-    async def get_tools(self, url: str, headers: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    async def get_tools(self, connection_config: Dict[str, Any], headers: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """
-        Connects to an MCP server via SSE and fetches the list of available tools.
+        Connects to an MCP server and fetches the list of available tools.
+        Args:
+            connection_config: Dict containing 'type' ('sse' or 'stdio') and 'configuration'.
         """
+        conn_type = connection_config.get("type", "sse")
+        config = connection_config.get("configuration", {})
         headers = headers or {}
-        try:
-            async with sse_client(url=url, headers=headers) as streams:
-                async with ClientSession(streams[0], streams[1]) as session:
-                    await session.initialize()
-                    result = await session.list_tools()
-                    # Convert tool objects to dictionary representation
-                    return [
-                        {
-                            "name": tool.name,
-                            "description": tool.description,
-                            "inputSchema": tool.inputSchema
-                        }
-                        for tool in result.tools
-                    ]
-        except Exception as e:
-            print(f"Error fetching tools from {url} via standard SSE: {e}. Trying fallback HTTP...")
+        
+        if conn_type == "stdio":
+            return await self._get_tools_stdio(config)
+        else:
+            # Default to SSE
+            url = config.get("url") or connection_config.get("url") # Fallback to top-level url if in config
+            if not url:
+                 raise ValueError("URL is required for SSE connections")
+            
             try:
-                result = await self._http_mcp_request(url, "tools/list", {}, headers)
-                if "tools" in result:
-                    return result["tools"]
-                return []
-            except Exception as e2:
-                print(f"Error fetching tools from {url} via fallback: {e2}")
-                raise e
+                # SSE Implementation
+                async with sse_client(url=url, headers=headers) as streams:
+                    async with ClientSession(streams[0], streams[1]) as session:
+                        await session.initialize()
+                        result = await session.list_tools()
+                        return [
+                            {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "inputSchema": tool.inputSchema
+                            }
+                            for tool in result.tools
+                        ]
+            except Exception as e:
+                print(f"Error fetching tools from {url} via standard SSE: {e}. Trying fallback HTTP...")
+                try:
+                    result = await self._http_mcp_request(url, "tools/list", {}, headers)
+                    if "tools" in result:
+                        return result["tools"]
+                    return []
+                except Exception as e2:
+                    print(f"Error fetching tools from {url} via fallback: {e2}")
+                    raise e
 
-    async def call_tool(self, url: str, tool_name: str, arguments: Dict[str, Any] = None, headers: Dict[str, Any] = None) -> Any:
-        """
-        Connects to an MCP server via SSE and executes a specific tool.
-        """
+    async def _get_tools_stdio(self, config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        from mcp.client.stdio import stdio_client
+        
+        command = config.get("command")
+        args = config.get("args", [])
+        env = config.get("env", {})
+        
+        server_params = StdioServerParameters(command=command, args=args, env=env)
+        
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.list_tools()
+                return [
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "inputSchema": tool.inputSchema
+                    }
+                    for tool in result.tools
+                ]
+
+    async def call_tool(self, connection_config: Dict[str, Any], tool_name: str, arguments: Dict[str, Any] = None, headers: Dict[str, Any] = None) -> Any:
+        conn_type = connection_config.get("type", "sse")
+        config = connection_config.get("configuration", {})
         headers = headers or {}
         arguments = arguments or {}
-        try:
-            async with sse_client(url=url, headers=headers) as streams:
-                async with ClientSession(streams[0], streams[1]) as session:
-                    await session.initialize()
-                    result: CallToolResult = await session.call_tool(name=tool_name, arguments=arguments)
-                    
-                    # Process result content
-                    output = []
-                    for content in result.content:
-                        if content.type == "text":
-                            output.append(content.text)
-                        elif content.type == "image":
-                            output.append(f"[Image: {content.mimeType}]") # Handle images if needed
-                        elif content.type == "resource":
-                             output.append(f"[Resource: {content.uri}]")
 
-                    return "\n".join(output)
-        except Exception as e:
-            print(f"Error calling tool {tool_name} on {url} via standard SSE: {e}. Trying fallback HTTP...")
+        if conn_type == "stdio":
+            return await self._call_tool_stdio(config, tool_name, arguments)
+        else:
+            url = config.get("url") or connection_config.get("url")
+            if not url:
+                 raise ValueError("URL is required for SSE connections")
+
             try:
-                params = {"name": tool_name, "arguments": arguments}
-                result = await self._http_mcp_request(url, "tools/call", params, headers)
-                
-                # Check for content in result (similar to tools/call structure)
-                output = []
-                if "content" in result:
-                    for content in result["content"]:
-                         if isinstance(content, dict):
-                            c_type = content.get("type")
-                            if c_type == "text":
-                                output.append(content.get("text", ""))
-                            elif c_type == "image":
-                                output.append(f"[Image: {content.get('mimeType')}]")
-                            elif c_type == "resource":
-                                output.append(f"[Resource: {content.get('uri')}]")
-                return "\n".join(output)
+                async with sse_client(url=url, headers=headers) as streams:
+                    async with ClientSession(streams[0], streams[1]) as session:
+                        await session.initialize()
+                        result: CallToolResult = await session.call_tool(name=tool_name, arguments=arguments)
+                        return self._process_tool_result(result)
+            except Exception as e:
+                 print(f"Error calling tool {tool_name} on {url} via standard SSE: {e}. Trying fallback HTTP...")
+                 try:
+                    params = {"name": tool_name, "arguments": arguments}
+                    result = await self._http_mcp_request(url, "tools/call", params, headers)
+                    
+                    # Manual processing since http fallback returns raw dict
+                    output = []
+                    if "content" in result:
+                        for content in result["content"]:
+                             if isinstance(content, dict):
+                                c_type = content.get("type")
+                                if c_type == "text":
+                                    output.append(content.get("text", ""))
+                                elif c_type == "image":
+                                    output.append(f"[Image: {content.get('mimeType')}]")
+                                elif c_type == "resource":
+                                    output.append(f"[Resource: {content.get('uri')}]")
+                    return "\n".join(output)
 
-            except Exception as e2:
-                print(f"Error calling tool {tool_name} on {url} via fallback: {e2}")
-                raise e
+                 except Exception as e2:
+                    print(f"Error calling tool {tool_name} on {url} via fallback: {e2}")
+                    raise e
+
+    async def _call_tool_stdio(self, config: Dict[str, Any], tool_name: str, arguments: Dict[str, Any]) -> str:
+        from mcp.client.stdio import stdio_client
+        
+        command = config.get("command")
+        args = config.get("args", [])
+        env = config.get("env", {})
+        
+        server_params = StdioServerParameters(command=command, args=args, env=env)
+        
+        async with stdio_client(server_params) as (read, write):
+             async with ClientSession(read, write) as session:
+                await session.initialize()
+                result: CallToolResult = await session.call_tool(name=tool_name, arguments=arguments)
+                return self._process_tool_result(result)
+
+    def _process_tool_result(self, result: CallToolResult) -> str:
+        output = []
+        for content in result.content:
+            if content.type == "text":
+                output.append(content.text)
+            elif content.type == "image":
+                output.append(f"[Image: {content.mimeType}]") 
+            elif content.type == "resource":
+                    output.append(f"[Resource: {content.uri}]")
+        return "\n".join(output)
 
     async def _http_mcp_request(self, url: str, method: str, params: Dict[str, Any], headers: Dict[str, Any] = None) -> Dict[str, Any]:
         """
