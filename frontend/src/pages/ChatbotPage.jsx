@@ -96,6 +96,11 @@ const ChatbotPage = () => {
     };
 
     const handleNewSession = async (projectId = null) => {
+        // Guard against event object being passed as projectId
+        if (projectId && projectId.nativeEvent) {
+            projectId = null;
+        }
+
         if (!selectedDbId) {
             alert("Please select a database first.");
             return;
@@ -115,7 +120,8 @@ const ChatbotPage = () => {
             setMessages([defaultMessage]);
         } catch (error) {
             console.error("Error creating session:", error);
-            alert("Failed to create new chat session.");
+            const errorDetail = error.response?.data?.detail || error.message;
+            alert(`Failed to create new chat session: ${errorDetail}`);
         } finally {
             setIsLoading(false);
         }
