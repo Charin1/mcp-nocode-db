@@ -120,6 +120,19 @@ docker-compose up --build
 
 ---
 
+### 4. Database Seeding
+To populate your database with sample data (parity across PostgreSQL and MySQL):
+
+```bash
+# In backend directory, ensuring you are in your venv
+source .venv/bin/activate
+python seed_db.py --db mysql_local
+# OR
+python seed_db.py --db postgres_docker
+```
+
+---
+
 ## 💻 Tech Stack
 
 *   **Backend:** Python 3.13+, FastAPI, SQLAlchemy (Async), Pydantic, Arq (Redis), Tenacity

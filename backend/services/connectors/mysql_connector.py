@@ -39,12 +39,23 @@ class MySqlConnector(BaseConnector):
                 cursor.execute("SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = %s", (db_name,))
                 tables = cursor.fetchall()
                 for table in tables:
-                    cursor.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s AND table_schema = %s", (table['table_name'], db_name))
+                    # Normalize keys to lowercase to handle potential case differences
+                    table_lower = {k.lower(): v for k, v in table.items()}
+                    t_name = table_lower.get('table_name')
+                    t_type = table_lower.get('table_type')
+                    
+                    cursor.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s AND table_schema = %s", (t_name, db_name))
                     columns = cursor.fetchall()
+                    
+                    cols_processed = []
+                    for col in columns:
+                         col_lower = {k.lower(): v for k, v in col.items()}
+                         cols_processed.append({"name": col_lower['column_name'], "type": col_lower['data_type']})
+
                     schema_data.append({
-                        "name": table['table_name'],
-                        "type": "view" if table['table_type'] == 'VIEW' else "table",
-                        "columns": [{"name": col['column_name'], "type": col['data_type']} for col in columns]
+                        "name": t_name,
+                        "type": "view" if t_type == 'VIEW' else "table",
+                        "columns": cols_processed
                     })
         finally:
             await self.disconnect()
