@@ -37,6 +37,7 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     query = Column(Text, nullable=True)
     chart_config = Column(JSON, nullable=True)
+    results = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     session = relationship("ChatSession", back_populates="messages")

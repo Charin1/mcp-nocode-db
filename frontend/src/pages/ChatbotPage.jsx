@@ -6,6 +6,7 @@ import ChatMessage from 'components/chat/ChatMessage';
 import ChatInput from 'components/chat/ChatInput';
 import SessionList from 'components/chat/SessionList';
 import { Bars3Icon, SparklesIcon } from '@heroicons/react/24/outline';
+import { autoDetectChartConfig, transformResultsToChartData } from '../utils/chartUtils';
 
 const ChatbotPage = () => {
     const defaultMessage = {
@@ -277,13 +278,7 @@ const ChatbotPage = () => {
         }
     };
 
-    const handleExecuteQuery = async (query) => {
-        // This is strictly for manual execution of a generated SQL. 
-        // It doesn't go through the chat "session" flow necessarily, or it should?
-        // If we want to record the results in the chat history, we should probably have an endpoint for it.
-        // For now, let's keep the existing "append local result" behavior for simplicity,
-        // as the "Execute" button is usually for "Preview" purposes.
-
+    const handleExecuteQuery = async (query, messageId, index) => {
         setIsLoading(true);
         try {
             const res = await apiClient.post('/api/query/execute', {
@@ -292,19 +287,35 @@ const ChatbotPage = () => {
                 model_provider: llmProvider,
             });
 
-            const resultMessage = {
-                role: 'assistant',
-                content: 'Query executed successfully. Here are the results:',
-                results: res.data
-            };
+            const results = res.data;
 
-            // We append this locally. If we refresh, this "Result" message might disappear 
-            // unless we persist "Tool Outputs" in DB. 
-            // Current DB schema has `chart_config` and `query` but not arbitrary result sets.
-            // For MVP persistence, we might accept losing large result table data on refresh, 
-            // but keeping the query + generated charts.
+            // Update Backend if we have an ID
+            console.log("DEBUG handleExecuteQuery - messageId:", messageId, "currentSessionId:", currentSessionId);
+            if (messageId && currentSessionId) {
+                try {
+                    console.log("DEBUG PATCH call:", `/api/chatbot/sessions/${currentSessionId}/messages/${messageId}`, { results: results });
+                    await apiClient.patch(`/api/chatbot/sessions/${currentSessionId}/messages/${messageId}`, {
+                        results: results
+                    });
+                    console.log("DEBUG PATCH success");
+                } catch (e) {
+                    console.error("Failed to persist results:", e);
+                }
+            } else {
+                console.warn("DEBUG: Skipping PATCH - missing messageId or currentSessionId");
+            }
 
-            setMessages(prev => [...prev, resultMessage]);
+            // Update Local State (In-place update of the message)
+            setMessages(prev => {
+                const newMsgs = [...prev];
+                if (index !== undefined && newMsgs[index]) {
+                    newMsgs[index] = {
+                        ...newMsgs[index],
+                        results: results
+                    };
+                }
+                return newMsgs;
+            });
 
         } catch (error) {
             let errorMsg = `Error executing query.`;
@@ -314,6 +325,38 @@ const ChatbotPage = () => {
             setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleVisualize = async (index, message) => {
+        // Toggle Visibility
+        setVisibleCharts(prev => ({ ...prev, [index]: !prev[index] }));
+
+        // Check if config already exists or results are missing
+        if ((message.chartConfig || message.chart_config) || !message.results) return;
+
+        // Generate Config
+        const data = transformResultsToChartData(message.results);
+        const config = autoDetectChartConfig(data, message.results.columns);
+
+        if (config) {
+            // Persist to Backend
+            if (message.id && currentSessionId) {
+                try {
+                    await apiClient.patch(`/api/chatbot/sessions/${currentSessionId}/messages/${message.id}`, {
+                        chart_config: config
+                    });
+                } catch (e) {
+                    console.error("Failed to persist chart config:", e);
+                }
+            }
+
+            // Update Local State
+            setMessages(prev => {
+                const newMsgs = [...prev];
+                newMsgs[index] = { ...newMsgs[index], chartConfig: config };
+                return newMsgs;
+            });
         }
     };
 
@@ -355,8 +398,8 @@ const ChatbotPage = () => {
                                 key={index}
                                 message={msg}
                                 isLast={index === messages.length - 1}
-                                onExecuteQuery={handleExecuteQuery}
-                                onVisualize={() => setVisibleCharts(prev => ({ ...prev, [index]: !prev[index] }))}
+                                onExecuteQuery={(query) => handleExecuteQuery(query, msg.id, index)}
+                                onVisualize={() => handleVisualize(index, msg)}
                                 visibleCharts={visibleCharts[index]}
                                 chartConfig={msg.chartConfig || msg.chart_config}
                             />

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import List, Optional, Any, Dict, Literal
 from datetime import datetime
 
@@ -19,8 +19,20 @@ class ChatMessageDB(BaseModel):
     content: str
     query: Optional[str] = None
     chart_config: Optional[Dict[str, Any]] = None
+    results: Optional[Dict[str, Any]] = None
     created_at: datetime
     
+    @field_validator('chart_config', 'results', mode='before')
+    @classmethod
+    def parse_json_fields(cls, v: Any) -> Optional[Dict[str, Any]]:
+        import json
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v
+
     model_config = ConfigDict(from_attributes=True)
 
 class CreateSessionRequest(BaseModel):

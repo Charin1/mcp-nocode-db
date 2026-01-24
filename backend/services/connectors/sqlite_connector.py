@@ -29,7 +29,7 @@ class SQLiteConnector(BaseConnector):
                          for col in cols:
                              # cid, name, type, notnull, dflt_value, pk
                              columns.append({"name": col[1], "type": col[2]})
-                     schema.append({"name": name, "ddl": sql, "columns": columns})
+                     schema.append({"name": name, "type": "table", "ddl": sql, "columns": columns})
         return schema
 
     async def get_schema_for_prompt(self) -> str:

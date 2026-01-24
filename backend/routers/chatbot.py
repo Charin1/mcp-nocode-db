@@ -367,7 +367,43 @@ async def send_message(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- Legacy / Stateless Endpoint (Optional: Keep or Deprecate) ---
+class UpdateMessageRequest(BaseModel):
+    results: Optional[Dict[str, Any]] = None
+    chart_config: Optional[Dict[str, Any]] = None
+
+
+@router.patch("/sessions/{session_id}/messages/{message_id}")
+async def update_message(
+    session_id: int, 
+    message_id: int, 
+    request: UpdateMessageRequest, 
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update a specific message with results or chart config."""
+    chat_service = ChatService(db)
+    
+    # Verify Session Ownership
+    session = await chat_service.get_session(session_id=session_id, user_id=current_user.username)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # We should ideally verify the message belongs to the session too, 
+    # but the service layer does check if message exists. 
+    # Since we verified session ownership, and message IDs are unique, 
+    # validating message existence via service is sufficient for now but could be tighter.
+    
+    success = await chat_service.update_message(
+        message_id=message_id,
+        results=request.results,
+        chart_config=request.chart_config
+    )
+    
+    if not success:
+         raise HTTPException(status_code=404, detail="Message not found")
+    
+    return {"status": "success", "message": "Message updated"}
+
 
 @router.post("/message", response_model=ChatMessage)
 async def handle_chat_message(

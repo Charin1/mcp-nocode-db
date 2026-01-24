@@ -125,3 +125,19 @@ class ChatService:
             select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.id.asc())
         )
         return result.scalars().all()
+
+    async def update_message(self, message_id: int, results: Dict = None, chart_config: Dict = None) -> bool:
+        result = await self.db.execute(
+            select(ChatMessage).where(ChatMessage.id == message_id)
+        )
+        message = result.scalars().first()
+        if not message:
+            return False
+            
+        if results is not None:
+            message.results = json.dumps(results)
+        if chart_config is not None:
+            message.chart_config = json.dumps(chart_config)
+            
+        await self.db.commit()
+        return True

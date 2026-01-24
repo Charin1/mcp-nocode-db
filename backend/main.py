@@ -42,8 +42,17 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """Initializes services and creates the first admin user if none exist."""
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migrate: Add 'results' column if missing
+        try:
+            await conn.execute(text("ALTER TABLE chat_messages ADD COLUMN results TEXT"))
+            print("DB Migration: Added 'results' column to chat_messages.")
+        except Exception as e:
+            # Column likely already exists
+            if "duplicate column" not in str(e).lower():
+                print(f"DB Migration Note: {e}")
     create_initial_admin_user()
 
 
