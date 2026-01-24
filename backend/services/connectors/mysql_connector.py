@@ -46,11 +46,52 @@ class MySqlConnector(BaseConnector):
                     
                     cursor.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s AND table_schema = %s", (t_name, db_name))
                     columns = cursor.fetchall()
+
+                    # Fetch Constraints (PK, FK)
+                    cursor.execute("""
+                        SELECT 
+                            k.column_name, 
+                            t.constraint_type, 
+                            k.referenced_table_name, 
+                            k.referenced_column_name 
+                        FROM information_schema.table_constraints t 
+                        JOIN information_schema.key_column_usage k 
+                        USING (constraint_name, table_schema, table_name) 
+                        WHERE t.table_schema = %s AND t.table_name = %s
+                    """, (db_name, t_name))
+                    constraints = cursor.fetchall()
+                    
+                    # Map column constraints
+                    col_details = {} # column_name -> "PK" or "FK -> table.col"
+                    
+                    for c in constraints:
+                         # Normalize keys if needed (DictCursor returns sensitive keys usually?)
+                         # Re-normalize to be safe
+                         c_lower = {k.lower(): v for k,v in c.items()}
+                         c_col = c_lower['column_name']
+                         c_type = c_lower['constraint_type']
+                         
+                         if c_type == 'PRIMARY KEY':
+                              col_details[c_col] = "PK"
+                         elif c_type == 'FOREIGN KEY':
+                              ref_table = c_lower['referenced_table_name']
+                              ref_col = c_lower['referenced_column_name']
+                              col_details[c_col] = f"FK -> {ref_table}.{ref_col}"
                     
                     cols_processed = []
                     for col in columns:
                          col_lower = {k.lower(): v for k, v in col.items()}
-                         cols_processed.append({"name": col_lower['column_name'], "type": col_lower['data_type']})
+                         c_name = col_lower['column_name']
+                         c_type = col_lower['data_type']
+                         
+                         # Add constraint info if exists
+                         extra_info = col_details.get(c_name, "")
+                         
+                         cols_processed.append({
+                             "name": c_name, 
+                             "type": c_type,
+                             "extra": extra_info
+                         })
 
                     schema_data.append({
                         "name": t_name,
@@ -65,7 +106,10 @@ class MySqlConnector(BaseConnector):
         schema_list = await self.get_schema()
         prompt_str = ""
         for table in schema_list:
-            columns_str = ", ".join([f"{col['name']} ({col['type']})" for col in table['columns']])
+            columns_str = ", ".join([
+                f"{col['name']} ({col['type']}" + (f", {col['extra']})" if col.get('extra') else ")")
+                for col in table['columns']
+            ])
             prompt_str += f"Table `{table['name']}`: {columns_str}\n"
         return prompt_str.strip()
 

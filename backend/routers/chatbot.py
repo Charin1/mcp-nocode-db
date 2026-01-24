@@ -232,7 +232,14 @@ async def send_message(
             
             for conn in active_connections:
                 try:
-                    conn_tools = await mcp_client.get_tools(url=conn.url, headers=conn.headers)
+                    conn_tools = await mcp_client.get_tools(
+                        connection_config={
+                            "type": conn.connection_type,
+                            "url": conn.url,
+                            "configuration": conn.configuration or {}
+                        },
+                        headers=conn.headers
+                    )
                     # Namespace tools to avoid collision? For now, raw.
                     tools.extend(conn_tools)
                 except Exception as e:
@@ -245,6 +252,7 @@ async def send_message(
         
         while current_turn < max_turns:
             current_turn += 1
+            print(f"--- Turn {current_turn}/{max_turns} ---")
             
             # Retrieve Context (Refresh each turn as we might add tool outputs)
             db_messages = await chat_service.get_session_messages(session_id=session_id)
@@ -260,6 +268,7 @@ async def send_message(
             db_engine = db_manager.get_db_engine(session.db_id)
             
             # Generate Response
+            print(f"Calling LLM: {model_provider} with {len(context_messages)} messages...")
             response_message = await llm_service.generate_response_from_messages(
                 db_id=session.db_id,
                 provider=model_provider,
@@ -268,6 +277,7 @@ async def send_message(
                 engine=db_engine,
                 tools=tools if tools else None
             )
+            print(f"LLM Response Received. Content len: {len(response_message.content) if response_message.content else 0}")
             
             if response_message.query and response_message.query.startswith("__TOOL_CALL__:"):
                 # It's a tool call
@@ -277,6 +287,8 @@ async def send_message(
                     tool_name = payload["tool"]
                     tool_args = payload["args"]
                     
+                    print(f"Model executing MCP Tool: {tool_name} with args: {tool_args}")
+
                     # Save the "Thought/Action" from assistant
                     await chat_service.add_message(
                         session_id=session_id,
@@ -286,47 +298,41 @@ async def send_message(
                     )
                     
                     # Find which connection has this tool
-                    # Naively search all active connections.
-                    # Ideally we should map tools to connections earlier.
-                    # We'll try all connections that have this tool.
                     tool_result = f"Error: Tool {tool_name} not found or failed execution."
                     
                     for conn in active_connections:
-                        # Optimization: we could store a map of tool->conn
-                        # For now, just try to call it on the active connections
-                        # But wait, call_tool requires knowing which connection.
-                        # Using 'get_tools' again is expensive.
-                        # Let's assume unique tool names or try all.
                          try:
-                             # We'll just try calling it. If it fails (404/method not found), continue.
-                             # But `call_tool` implementation expects us to know the URL.
-                             # Let's try to call it.
                              # TODO: Improve efficient tool routing.
+                             print(f"Sending tool call to connection: {conn.name} ({conn.url})")
                              res = await mcp_client.call_tool(
-                                 url=conn.url, 
+                                 connection_config={
+                                     "type": conn.connection_type,
+                                     "url": conn.url,
+                                     "configuration": conn.configuration or {}
+                                 }, 
                                  tool_name=tool_name, 
                                  arguments=tool_args, 
                                  headers=conn.headers
                              )
                              tool_result = f"Tool Output: {res}"
+                             print(f"Tool executed successfully. Output len: {len(str(res))}")
                              break # Success
-                         except:
+                         except Exception as exc:
+                             print(f"Tool execution failed on {conn.name}: {exc}")
                              continue
                     
-                    # Save Tool Result as User message (or System? Standard ReAct uses Observation)
-                    # But ChatMessage model supports 'user' and 'assistant'. 
-                    # We'll use 'user' with a specific prefix so LLM knows it's an observation.
+                    # Save Tool Result
                     await chat_service.add_message(
                         session_id=session_id,
                         role="user",
                         content=f"Observation: {tool_result}"
                     )
                     
-                    # Loop continues to next iteration to let LLM process observation
+                    # Loop continues
                     continue
                     
                 except Exception as e:
-                    # Tool parsing/execution failed
+                    print(f"Error parsing/executing tool call: {e}")
                     await chat_service.add_message(
                         session_id=session_id,
                         role="user",
@@ -335,6 +341,9 @@ async def send_message(
                     continue
             else:
                 # Final response (or just a question/SQL query)
+                print("Model provided final response or SQL.")
+                if response_message.query:
+                     print(f"Generated SQL/Command: {response_message.query}")
                 final_response_message = response_message
                 break
         
@@ -349,26 +358,11 @@ async def send_message(
             query=final_response_message.query
         )
         
-        # Return the saved assistant message as a list (might need to return the whole chain? 
-        # The frontend likely polls or appends. 
-        # We should return at least the final one. 
-        # If we added intermediate messages, the frontend might miss them if it only expects the return of this call.
-        # But `add_message` saves to DB, so if frontend re-fetches or we return all new messages...
-        # The current contract returns `List[ChatMessageDB]`.
-        # We should return ALL messages added during this turn.
-        # Let's fetch messages added after the user message.
-        # Or simpler: return the list of messages we added.
-        # Since we didn't track them explicitly in a list, we can just return a list containing the final one
-        # and assume frontend re-fetches. BUT standard chat UI expects the response to append.
-        # If we added 'Thought' messages, we might want to return them too.
-        # For now, let's just return the final one to keep it simple, or fetching the last N messages.
-        
-        # Actually, let's return the last message (final response).
-        # Intermediate steps are in DB history.
         return [saved_response]
 
     except Exception as e:
         # Log error in chat?
+        print(f"Critical Error in chat loop: {e}")
         await chat_service.add_message(session_id=session_id, role="assistant", content=f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 

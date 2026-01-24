@@ -53,6 +53,42 @@ class PostgresConnector(BaseConnector):
                         (table["table_name"],),
                     )
                     columns = cur.fetchall()
+                    # Fetch Constraints correctly for Postgres
+                    cur.execute(
+                        """
+                        SELECT 
+                            kcu.column_name, 
+                            tc.constraint_type, 
+                            ccu.table_name AS foreign_table_name,
+                            ccu.column_name AS foreign_column_name 
+                        FROM information_schema.table_constraints AS tc 
+                        JOIN information_schema.key_column_usage AS kcu
+                          ON tc.constraint_name = kcu.constraint_name
+                          AND tc.table_schema = kcu.table_schema
+                        LEFT JOIN information_schema.constraint_column_usage AS ccu
+                          ON ccu.constraint_name = tc.constraint_name
+                          AND ccu.table_schema = tc.table_schema
+                        WHERE tc.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY') 
+                          AND tc.table_name = %s
+                          AND tc.table_schema = 'public';
+                        """,
+                        (table["table_name"],)
+                    )
+                    constraints = cur.fetchall()
+                    
+                    col_details = {}
+                    for c in constraints:
+                         # psycopg2 DictRow access
+                         c_col = c["column_name"]
+                         c_type = c["constraint_type"]
+                         
+                         if c_type == 'PRIMARY KEY':
+                              col_details[c_col] = "PK"
+                         elif c_type == 'FOREIGN KEY':
+                              ref_table = c["foreign_table_name"]
+                              ref_col = c["foreign_column_name"]
+                              col_details[c_col] = f"FK -> {ref_table}.{ref_col}"
+
                     schema_data.append(
                         {
                             "name": table["table_name"],
@@ -60,7 +96,11 @@ class PostgresConnector(BaseConnector):
                                 "view" if table["table_type"] == "VIEW" else "table"
                             ),
                             "columns": [
-                                {"name": col["column_name"], "type": col["data_type"]}
+                                {
+                                    "name": col["column_name"], 
+                                    "type": col["data_type"],
+                                    "extra": col_details.get(col["column_name"], "")
+                                }
                                 for col in columns
                             ],
                         }
@@ -74,7 +114,10 @@ class PostgresConnector(BaseConnector):
         prompt_str = ""
         for table in schema_list:
             columns_str = ", ".join(
-                [f"{col['name']} ({col['type']})" for col in table["columns"]]
+                [
+                    f"{col['name']} ({col['type']}" + (f", {col['extra']})" if col.get('extra') else ")")
+                    for col in table["columns"]
+                ]
             )
             prompt_str += f"Table {table['name']}: {columns_str}\n"
         return prompt_str.strip()

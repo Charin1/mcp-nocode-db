@@ -8,7 +8,7 @@ databases:
     host: "localhost"
     port: 5432
     user: "postgres"
-    password: "mlp123"
+    password: "your_postgres_password"
     dbname: "sampledb"
     allow_mutations: true # Set to true for admin testing
 
@@ -35,15 +35,15 @@ databases:
 
   # --- Examples for other databases (uncomment and configure if needed) ---
   #
-  # mysql_local:
-  #   name: "MySQL (Local)"
-  #   engine: "mysql"
-  #   host: "localhost"
-  #   port: 3306
-  #   user: "root"
-  #   password: "your_mysql_password"
-  #   dbname: "testdb"
-  #   allow_mutations: false
+  mysql_local:
+    name: "MySQL (Local)"
+    engine: "mysql"
+    host: "localhost"
+    port: 3306
+    user: "root"
+    password: "your_mysql_password"
+    dbname: "sampledb"
+    allow_mutations: false
   #
   # elastic_local:
   #   name: "Elasticsearch (Local)"

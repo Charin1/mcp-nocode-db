@@ -145,6 +145,7 @@ class LLMService:
         tools_instruction = ""
         if tools:
             import json
+            print(f"DEBUG: Injecting tools into prompt: {[t['name'] for t in tools]}")
             tools_json = json.dumps(tools, indent=2)
             tools_instruction = f"""
             ### Available Tools
@@ -179,13 +180,25 @@ class LLMService:
             you can generate a {query_language} for a {engine} database.
 
             ### Instructions
-            1.  If the user is asking a question that requires data, generate a **read-only query or command**.
-            2.  When you generate a query, **ONLY return the query inside a ```{query_block_tag} ... ``` block.** Do not include any other text in your response.
-            3.  If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
-            4.  Use the provided conversation history for context.
+            1.  **Orchestration / Tool Selection**:
+                - You have two primary ways to retrieve information:
+                    a. **Internal Database**: For questions about the local data (tables, rows) in the `{engine}` database, generate a `{query_language}`.
+                    b. **External Tools**: For requests matching the capabilities of the available tools listed below, use the appropriate tool.
+                - **CRITICAL**: Do NOT try to query the internal database for information that should come from an external tool, and vice versa.
+                - Check the **Available Tools** descriptions carefully. If a user asks for something that matches a tool's description, use the tool.
+
+            2.  **Internal Database Querying**:
+                - If the user is asking a question that requires data from the `{engine}` internal database, generate a **read-only query or command**.
+                - When you generate a query, **ONLY return the query inside a ```{query_block_tag} ... ``` block.** Do not include any other text in your response.
+
+            3.  **General Conversation**:
+                - If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
+
+            4.  **Context**:
+                - Use the provided conversation history for context.
 
             {tools_instruction}
-            ### Database Schema
+            ### Internal Database Schema
             {schema}
             ### Conversation History
             {history}
@@ -230,13 +243,25 @@ class LLMService:
             you can generate a {query_language} for a {engine} database.
 
             ### Instructions
-            1.  If the user is asking a question that requires data, generate a **read-only query or command**.
-            2.  When you generate a query, **ONLY return the query inside a ```{query_block_tag} ... ``` block.** Do not include any other text in your response.
-            3.  If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
-            4.  Use the provided conversation history for context.
+            1.  **Orchestration / Tool Selection**:
+                - You have two primary ways to retrieve information:
+                    a. **Internal Database**: For questions about the local data (tables, rows) in the `{engine}` database, generate a `{query_language}`.
+                    b. **External Tools**: For requests matching the capabilities of the available tools listed below, use the appropriate tool.
+                - **CRITICAL**: Do NOT try to query the internal database for information that should come from an external tool, and vice versa.
+                - Check the **Available Tools** descriptions carefully. If a user asks for something that matches a tool's description, use the tool.
+
+            2.  **Internal Database Querying**:
+                - If the user is asking a question that requires data from the `{engine}` internal database, generate a **read-only query or command**.
+                - When you generate a query, **ONLY return the query inside a ```{query_block_tag} ... ``` block.** Do not include any other text in your response.
+
+            3.  **General Conversation**:
+                - If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
+
+            4.  **Context**:
+                - Use the provided conversation history for context.
 
             {tools_instruction}
-            ### Database Schema
+            ### Internal Database Schema
             {schema}
             """
 

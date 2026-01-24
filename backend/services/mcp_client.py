@@ -41,8 +41,12 @@ class McpClientService:
                             }
                             for tool in result.tools
                         ]
-            except Exception as e:
-                print(f"Error fetching tools from {url} via standard SSE: {e}. Trying fallback HTTP...")
+            except BaseException as e:
+                # Catch ExceptionGroup or other async errors to ensure fallback runs
+                # Also catch explicit 405 from underlying libs if they bubble up differently
+                print(f"Error fetching tools from {url} via standard SSE: {e}. Broad fallback initiated...")
+                
+                # Generic Fallback: If SSE fails (e.g. 405 Method Not Allowed), try stateless HTTP POST
                 try:
                     result = await self._http_mcp_request(url, "tools/list", {}, headers)
                     if "tools" in result:
@@ -50,7 +54,8 @@ class McpClientService:
                     return []
                 except Exception as e2:
                     print(f"Error fetching tools from {url} via fallback: {e2}")
-                    raise e
+                    # If fallback also fails, raise the original error or the new one
+                    raise e2 from e
 
     async def _get_tools_stdio(self, config: Dict[str, Any]) -> List[Dict[str, Any]]:
         from mcp.client.stdio import stdio_client
@@ -92,8 +97,10 @@ class McpClientService:
                     async with ClientSession(streams[0], streams[1]) as session:
                         await session.initialize()
                         result: CallToolResult = await session.call_tool(name=tool_name, arguments=arguments)
-                        return self._process_tool_result(result)
-            except Exception as e:
+                        processed_res = self._process_tool_result(result)
+                        print(f"DEBUG: MCP Tool '{tool_name}' SSE Success. Output Snippet: {processed_res[:200]}...")
+                        return processed_res
+            except BaseException as e:
                  print(f"Error calling tool {tool_name} on {url} via standard SSE: {e}. Trying fallback HTTP...")
                  try:
                     params = {"name": tool_name, "arguments": arguments}
@@ -111,7 +118,10 @@ class McpClientService:
                                     output.append(f"[Image: {content.get('mimeType')}]")
                                 elif c_type == "resource":
                                     output.append(f"[Resource: {content.get('uri')}]")
-                    return "\n".join(output)
+                                    output.append(f"[Resource: {content.get('uri')}]")
+                    final_res = "\n".join(output)
+                    print(f"DEBUG: MCP Tool '{tool_name}' HTTP Fallback Success. Output Snippet: {final_res[:200]}...")
+                    return final_res
 
                  except Exception as e2:
                     print(f"Error calling tool {tool_name} on {url} via fallback: {e2}")
@@ -164,8 +174,12 @@ class McpClientService:
         
         print(f"DEBUG: Sending fallback request to {url} with headers {headers}")
         
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             async with client.stream("POST", url, json=payload, headers=headers) as response:
+                if response.status_code >= 400:
+                    body = await response.aread()
+                    print(f"DEBUG: HTTP {response.status_code} Error Body: {body.decode('utf-8')}")
+                
                 response.raise_for_status()
                 
                 async for line in response.aiter_lines():

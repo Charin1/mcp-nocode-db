@@ -94,8 +94,14 @@ class DbManager:
         return await connector.get_sample_data(object_name)
 
     async def execute_query(self, db_id: str, query: str) -> Dict[str, Any]:
+        print(f"DEBUG: Executing SQL/Query on {db_id}: {query}")
         connector = self.get_connector(db_id)
-        return await connector.execute_query(query)
+        result = await connector.execute_query(query)
+        if "rows" in result:
+             print(f"DEBUG: SQL Execution Success. Rows returned: {len(result['rows'])}")
+        else:
+             print(f"DEBUG: SQL Execution Result: {result.keys()}")
+        return result
 
     def is_mutation_query(self, db_id: str, query: str) -> bool:
         connector = self.get_connector(db_id)
