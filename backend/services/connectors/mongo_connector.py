@@ -58,17 +58,21 @@ class MongoConnector(BaseConnector):
     async def execute_query(self, query: str) -> Dict[str, Any]:
         """
         Executes a MongoDB query. 
-        Expects query to be a JSON string representing the filter for find().
+        Expects query to be a JSON string.
+        Supported operations:
+        - {"collection": "...", "filter": ...}  (Defaults to find)
+        - {"collection": "...", "operation": "find", "filter": ...}
+        - {"collection": "...", "operation": "insert_one", "data": ...}
+        - {"collection": "...", "operation": "insert_many", "data": [...]}
+        - {"collection": "...", "operation": "update_one", "filter": ..., "update": ...}
+        - {"collection": "...", "operation": "update_many", "filter": ..., "update": ...}
+        - {"collection": "...", "operation": "delete_one", "filter": ...}
+        - {"collection": "...", "operation": "delete_many", "filter": ...}
         """
         await self.connect()
         try:
-            # We assume for now the user is querying the first collection they see or we need a way to specify collection
-            # This is a simplification. A better way would be to parse the query or have a multi-part query.
-            # For this tool's NL-to-Mongo, we'll try to guess the collection or require it in the prompt.
-            # Let's assume the query is a JSON like: {"collection": "users", "filter": {...}}
             query_data = json.loads(query)
             collection_name = query_data.get("collection")
-            filter_obj = query_data.get("filter", {})
             
             if not collection_name:
                 # Fallback: try to find user's intent or use the first collection
@@ -77,17 +81,68 @@ class MongoConnector(BaseConnector):
                     return {"error": "No collections found in database."}
                 collection_name = collections[0]
 
-            cursor = self.db[collection_name].find(filter_obj).limit(100)
-            results = await cursor.to_list(length=100)
+            operation = query_data.get("operation", "find")
+            coll = self.db[collection_name]
             
-            for doc in results:
-                if "_id" in doc:
-                    doc["_id"] = str(doc["_id"])
-                    
-            return {"json_result": results, "rows_affected": len(results)}
+            if operation == "find":
+                filter_obj = query_data.get("filter", {})
+                cursor = coll.find(filter_obj).limit(100)
+                results = await cursor.to_list(length=100)
+                for doc in results:
+                    if "_id" in doc:
+                        doc["_id"] = str(doc["_id"])
+                return {"json_result": results, "rows_affected": len(results)}
+
+            elif operation == "insert_one":
+                data = query_data.get("data")
+                if not data:
+                    return {"error": "No data provided for insert_one"}
+                result = await coll.insert_one(data)
+                return {"json_result": {"inserted_id": str(result.inserted_id)}, "rows_affected": 1}
+
+            elif operation == "insert_many":
+                data = query_data.get("data")
+                if not data or not isinstance(data, list):
+                    return {"error": "Data must be a list for insert_many"}
+                result = await coll.insert_many(data)
+                return {"json_result": {"inserted_ids": [str(id) for id in result.inserted_ids]}, "rows_affected": len(result.inserted_ids)}
+
+            elif operation == "update_one":
+                filter_obj = query_data.get("filter", {})
+                update_obj = query_data.get("update")
+                if not update_obj:
+                    return {"error": "No update object provided for update_one"}
+                result = await coll.update_one(filter_obj, update_obj)
+                return {"json_result": {"modified_count": result.modified_count}, "rows_affected": result.modified_count}
+
+            elif operation == "update_many":
+                filter_obj = query_data.get("filter", {})
+                update_obj = query_data.get("update")
+                if not update_obj:
+                    return {"error": "No update object provided for update_many"}
+                result = await coll.update_many(filter_obj, update_obj)
+                return {"json_result": {"modified_count": result.modified_count}, "rows_affected": result.modified_count}
+
+            elif operation == "delete_one":
+                filter_obj = query_data.get("filter", {})
+                result = await coll.delete_one(filter_obj)
+                return {"json_result": {"deleted_count": result.deleted_count}, "rows_affected": result.deleted_count}
+
+            elif operation == "delete_many":
+                filter_obj = query_data.get("filter", {})
+                result = await coll.delete_many(filter_obj)
+                return {"json_result": {"deleted_count": result.deleted_count}, "rows_affected": result.deleted_count}
+
+            else:
+                return {"error": f"Unsupported operation: {operation}"}
+
         except Exception as e:
             raise RuntimeError(f"MongoDB query failed: {e}")
 
     def is_mutation(self, query: str) -> bool:
-        # Currently only supporting read-only find() via execute_query
-        return False
+        try:
+            query_data = json.loads(query)
+            operation = query_data.get("operation", "find")
+            return operation in ["insert_one", "insert_many", "update_one", "update_many", "delete_one", "delete_many"]
+        except:
+            return False

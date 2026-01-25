@@ -1,0 +1,56 @@
+{
+    "users": [
+        {
+            "name": "Alice Johnson",
+            "email": "alice@example.com",
+            "role": "admin",
+            "created_at": "2023-01-01T10:00:00Z"
+        },
+        {
+            "name": "Bob Smith",
+            "email": "bob@example.com",
+            "role": "user",
+            "created_at": "2023-01-02T11:00:00Z"
+        },
+        {
+            "name": "Charlie Brown",
+            "email": "charlie@example.com",
+            "role": "manager",
+            "created_at": "2023-01-03T12:00:00Z"
+        }
+    ],
+    "products": [
+        {
+            "name": "SuperWidget 3000",
+            "price": 99.99,
+            "category": "Electronics",
+            "stock": 50
+        },
+        {
+            "name": "ErgoChair",
+            "price": 249.50,
+            "category": "Furniture",
+            "stock": 20
+        },
+        {
+            "name": "Wireless Mouse",
+            "price": 25.00,
+            "category": "Electronics",
+            "stock": 100
+        }
+    ],
+    "sales": [
+        {
+            "product_name": "SuperWidget 3000",
+            "quantity": 2,
+            "total_price": 199.98,
+            "date": "2023-02-01"
+        },
+        {
+            "product_name": "ErgoChair",
+            "quantity": 1,
+            "total_price": 249.50,
+            "date": "2023-02-05"
+        }
+    ]
+}

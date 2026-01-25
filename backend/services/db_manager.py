@@ -2,11 +2,37 @@ import yaml
 from typing import Dict, Any, List
 
 from services.connectors.base_connector import BaseConnector
-from services.connectors.postgres_connector import PostgresConnector
-from services.connectors.mongo_connector import MongoConnector
-from services.connectors.redis_connector import RedisConnector
-from services.connectors.mysql_connector import MySqlConnector
-from services.connectors.sqlite_connector import SQLiteConnector
+
+try:
+    from services.connectors.postgres_connector import PostgresConnector
+except ImportError:
+    # print(f"Failed to import PostgresConnector: {e}")
+    PostgresConnector = None
+
+try:
+    from services.connectors.mongo_connector import MongoConnector
+except ImportError:
+    # print(f"Failed to import MongoConnector: {e}")
+    MongoConnector = None
+
+try:
+    from services.connectors.redis_connector import RedisConnector
+except ImportError:
+    # print(f"Failed to import RedisConnector: {e}")
+    RedisConnector = None
+
+try:
+    from services.connectors.mysql_connector import MySqlConnector
+except ImportError:
+    # print(f"Failed to import MySqlConnector: {e}")
+    MySqlConnector = None
+
+try:
+    from services.connectors.sqlite_connector import SQLiteConnector
+except ImportError:
+    # print(f"Failed to import SQLiteConnector: {e}")
+    SQLiteConnector = None
+
 # from services.connectors.elasticsearch_connector import ElasticsearchConnector
 # from services.connectors.bigquery_connector import BigQueryConnector
 from models.database import AppConfig, DBConnection
@@ -32,15 +58,30 @@ class DbManager:
         for db_id, db_info in db_configs.items():
             engine = db_info.get("engine")
             if engine == "postgresql":
-                self._connectors[db_id] = PostgresConnector(db_info)
+                if PostgresConnector:
+                    self._connectors[db_id] = PostgresConnector(db_info)
+                else:
+                    print(f"Warning: PostgresConnector not loaded. Skipping {db_id}")
             elif engine == "mysql":
-                self._connectors[db_id] = MySqlConnector(db_info)
+                if MySqlConnector:
+                    self._connectors[db_id] = MySqlConnector(db_info)
+                else:
+                    print(f"Warning: MySqlConnector not loaded. Skipping {db_id}")
             elif engine == "mongodb":
-                self._connectors[db_id] = MongoConnector(db_info)
+                if MongoConnector:
+                    self._connectors[db_id] = MongoConnector(db_info)
+                else:
+                    print(f"Warning: MongoConnector not loaded. Skipping {db_id}")
             elif engine == "redis":
-                self._connectors[db_id] = RedisConnector(db_info)
+                if RedisConnector:
+                    self._connectors[db_id] = RedisConnector(db_info)
+                else:
+                    print(f"Warning: RedisConnector not loaded. Skipping {db_id}")
             elif engine == "sqlite":
-                self._connectors[db_id] = SQLiteConnector(db_info)
+                if SQLiteConnector:
+                    self._connectors[db_id] = SQLiteConnector(db_info)
+                else:
+                    print(f"Warning: SQLiteConnector not loaded. Skipping {db_id}")
             # elif engine == "elasticsearch":
             #     self._connectors[db_id] = ElasticsearchConnector(db_info)
             # elif engine == "bigquery":

@@ -3,6 +3,7 @@ import asyncio
 import os
 import sys
 import argparse
+import json
 from typing import List
 
 # Add backend to path to import modules
@@ -92,6 +93,33 @@ async def seed_db(target_db: str = None):
                 seed_file = "postgres_seed.sql"
             elif engine == "mysql":
                 seed_file = "mysql_seed.sql"
+            elif engine == "mongodb":
+                seed_file = "mongo_seed.json"
+                full_path = os.path.join(seed_dir, seed_file)
+                print(f"Reading seed file: {full_path}")
+                
+                if not os.path.exists(full_path):
+                    print(f"Error: Seed file not found at {full_path}")
+                    continue
+
+                with open(full_path, 'r') as f:
+                    mongo_data = json.load(f)
+                
+                for collection_name, documents in mongo_data.items():
+                    print(f"Seeding collection: {collection_name} with {len(documents)} documents...")
+                    payload = json.dumps({
+                        "collection": collection_name,
+                        "operation": "insert_many",
+                        "data": documents
+                    })
+                    try:
+                        await connector.execute_query(payload)
+                    except Exception as e:
+                        print(f"Error seeding collection {collection_name}: {e}")
+                
+                print("MongoDB seeding completed.")
+                continue
+
             elif engine == "sqlite":
                 # Assuming sqlite might use postgres syntax or has its own
                 # For now, let's skip or try postgres if compatible
