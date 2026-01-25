@@ -18,12 +18,19 @@ databases:
     path: "mcp_nocode_db.db"
     allow_mutations: true
 
-  # mongo_docker:
-  #   name: "MongoDB (Docker)"
-  #   engine: "mongodb"
-  #   # The connection string for the Docker setup
-  #   connection_string: "mongodb://admin:password@mongo:27017/"
-  #   allow_mutations: true # Set to true for admin testing
+  mongo_docker:
+    name: "MongoDB (Docker)"
+    engine: "mongodb"
+    # The connection string for the Docker setup
+    connection_string: "mongodb://admin:password@mongo:27017/"
+    allow_mutations: true # Set to true for admin testing
+
+  mongo_local:
+    name: "MongoDB (Local)"
+    engine: "mongodb"
+    connection_string: "mongodb://localhost:27017/"
+    dbname: "nocode_test_db"
+    allow_mutations: true
 
   # redis_docker:
   #   name: "Redis (Docker)"

@@ -34,6 +34,7 @@ class MongoConnector(BaseConnector):
             fields = list(sample.keys()) if sample else []
             schema_data.append({
                 "name": coll_name,
+                "type": "collection",
                 "fields": fields
             })
         return schema_data
@@ -122,6 +123,17 @@ class MongoConnector(BaseConnector):
                     return {"error": "No update object provided for update_many"}
                 result = await coll.update_many(filter_obj, update_obj)
                 return {"json_result": {"modified_count": result.modified_count}, "rows_affected": result.modified_count}
+
+            elif operation == "aggregate":
+                pipeline = query_data.get("pipeline")
+                if not pipeline or not isinstance(pipeline, list):
+                    return {"error": "Pipeline must be a list for aggregate"}
+                cursor = coll.aggregate(pipeline)
+                results = await cursor.to_list(length=100)
+                for doc in results:
+                    if "_id" in doc:
+                        doc["_id"] = str(doc["_id"])
+                return {"json_result": results, "rows_affected": len(results)}
 
             elif operation == "delete_one":
                 filter_obj = query_data.get("filter", {})

@@ -98,20 +98,62 @@ class LLMService:
                 "{nl_query}"
                 ### Your Output
                 """
-        elif engine == "mongodb":
+
             return f"""
-                Your task is to convert a natural language query into a valid MongoDB query object for use in `db.collection.find()`.
-                ### Instructions
-                1.  Your output MUST be a single, valid JSON object.
-                2.  This JSON object should represent the `filter` part of a `find` operation.
-                3.  Use appropriate MongoDB query operators (e.g., `$gt`, `$lt`, `$in`, `$regex`).
-                4.  For date-based queries, assume the dates in the database are stored in ISODate format. Use the format `{{"$gte": {{"$date": "YYYY-MM-DDTHH:mm:ssZ"}}}}`.
-                5.  Analyze the user's query and the database schema (collections and fields) carefully.
-                ### Database Schema (Collections and sample fields)
-                {schema}
-                ### Natural Language Query
-                "{nl_query}"
-                ### Your Output (JSON filter object only)
+                You are a MongoDB Query Generator. You are NOT a conversational assistant.
+                Your ONLY task is to output a JSON object representing a MongoDB query filter.
+
+                ### INPUT
+                Natural Language Query: "{nl_query}"
+                Database Schema: {schema}
+
+                ### OUTPUT REQUIREMENTS
+                1. Output MUST be valid JSON.
+                2. Output MUST be enclosed in ```json``` markdown code blocks.
+                3. Do NOT include any explanations, introductions, or other text. ONLY the JSON block.
+                4. The JSON must have exactly two keys:
+                   - "collection": The name of the collection to start with.
+                   - "operation": "find" (default) or "aggregate".
+                   - "filter": (If operation is "find") The query filter object.
+                   - "pipeline": (If operation is "aggregate") The aggregation pipeline list.
+                5. Use "aggregate" and $lookup for queries involving relationships (joins).
+                6. Use MongoDB operators like $gt, $lt, $in, $regex, etc.
+
+                ### EXAMPLES
+                
+                Example 1 (Simple Find):
+                Input: "Find users older than 25"
+                Output:
+                ```json
+                {{
+                  "collection": "users",
+                  "operation": "find",
+                  "filter": {{ "age": {{ "$gt": 25 }} }}
+                }}
+                ```
+                
+                Example 2 (Aggregation/Relationship):
+                Input: "Get sales with product details"
+                Output:
+                ```json
+                {{
+                  "collection": "sales",
+                  "operation": "aggregate",
+                  "pipeline": [
+                    {{
+                        "$lookup": {{
+                            "from": "products",
+                            "localField": "product_id",
+                            "foreignField": "_id",
+                            "as": "product_info"
+                        }}
+                    }},
+                    {{ "$unwind": "$product_info" }}
+                  ]
+                }}
+                ```
+                
+                ### YOUR RESPONSE
                 """
         elif engine == "redis":
             return f"""
@@ -169,30 +211,36 @@ class LLMService:
         elif engine == "redis":
             query_language = "Redis command"
             query_block_tag = "redis"
+        elif engine == "mongodb":
+            query_language = "MongoDB query (JSON)"
+            query_block_tag = "json"
         else:
             query_language = f"{engine} query"
             query_block_tag = "text"
 
         return f"""
-            You are a helpful and friendly database assistant chatbot.
-            Your goal is to help the user explore a database by answering their questions.
-            You can either have a conversation or, if the user asks for specific data,
-            you can generate a {query_language} for a {engine} database.
+            You are an expert MongoDB Query Generator. 
+            You are NOT a conversational assistant. You are a code generation engine.
+            Your ONLY purpose is to output valid JSON configuration for MongoDB queries.
 
             ### Instructions
-            1.  **Orchestration / Tool Selection**:
-                - You have two primary ways to retrieve information:
-                    a. **Internal Database**: For questions about the local data (tables, rows) in the `{engine}` database, generate a `{query_language}`.
-                    b. **External Tools**: For requests matching the capabilities of the available tools listed below, use the appropriate tool.
-                - **CRITICAL**: Do NOT try to query the internal database for information that should come from an external tool, and vice versa.
-                - Check the **Available Tools** descriptions carefully. If a user asks for something that matches a tool's description, use the tool.
+            1.  **Response Format**:
+                - Output MUST be a single, valid JSON object.
+                - Enclose the JSON in ```json``` markdown blocks.
+                - **NO** introductory text.
+                - **ONLY** the JSON block.
 
-            2.  **Internal Database Querying**:
-                - If the user is asking a question that requires data from the `{engine}` internal database, generate a **read-only query or command**.
-                - When you generate a query, **ONLY return the query inside a ```{query_block_tag} ... ``` block.** Do not include any other text in your response.
+            2.  **Orchestration**:
+                - If the user asks for data, generate the MongoDB JSON.
+                - Check **Available Tools** first.
 
-            3.  **General Conversation**:
-                - If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
+            3.  **MongoDB Query Format**:
+                - Return a JSON object with:
+                  - "collection": "name"
+                  - "operation": "find" or "aggregate"
+                  - "filter": {{}} (for find)
+                  - "pipeline": [] (for aggregate)
+                - Do NOT use JavaScript connection code or `db.collection` syntax. Just the JSON.
 
             4.  **Context**:
                 - Use the provided conversation history for context.
@@ -237,25 +285,32 @@ class LLMService:
             """
 
         return f"""
-            You are a helpful and friendly database assistant chatbot.
-            Your goal is to help the user explore a database by answering their questions.
-            You can either have a conversation or, if the user asks for specific data,
-            you can generate a {query_language} for a {engine} database.
+            You are an expert MongoDB Query Generator. 
+            You are NOT a conversational assistant. You are a code generation engine.
+            Your ONLY purpose is to output valid JSON configuration for MongoDB queries.
 
             ### Instructions
-            1.  **Orchestration / Tool Selection**:
-                - You have two primary ways to retrieve information:
-                    a. **Internal Database**: For questions about the local data (tables, rows) in the `{engine}` database, generate a `{query_language}`.
-                    b. **External Tools**: For requests matching the capabilities of the available tools listed below, use the appropriate tool.
-                - **CRITICAL**: Do NOT try to query the internal database for information that should come from an external tool, and vice versa.
-                - Check the **Available Tools** descriptions carefully. If a user asks for something that matches a tool's description, use the tool.
+            1.  **Response Format**:
+                - Output MUST be a single, valid JSON object.
+                - Enclose the JSON in ```json``` markdown blocks.
+                - **NO** introductory text (e.g., "Here is the query").
+                - **NO** explaining the query.
+                - **NO** "Note:" or "Example:".
+                - **ONLY** the JSON block.
 
-            2.  **Internal Database Querying**:
-                - If the user is asking a question that requires data from the `{engine}` internal database, generate a **read-only query or command**.
-                - When you generate a query, **ONLY return the query inside a ```{query_block_tag} ... ``` block.** Do not include any other text in your response.
+            2.  **Orchestration**:
+                - If the user asks for data, generate the MongoDB JSON.
+                - If the user asks a general question *unrelated* to data retrieval, you may answer briefly.
+                - But if the intent is to QUERY DATA, you must return JSON ONLY.
+                - Check **Available Tools** first.
 
-            3.  **General Conversation**:
-                - If the user is just chatting or asking a general question, respond in a friendly, conversational manner.
+            3.  **MongoDB Query Format**:
+                - Return a JSON object with:
+                  - "collection": "name"
+                  - "operation": "find" or "aggregate"
+                  - "filter": {{}} (for find)
+                  - "pipeline": [] (for aggregate)
+                - Do NOT use JavaScript connection code or `db.collection` syntax. Just the JSON.
 
             4.  **Context**:
                 - Use the provided conversation history for context.
@@ -387,13 +442,65 @@ class LLMService:
                 )
 
         elif engine == "mongodb":
+            import re
+            # Try to find a JSON block
+            match = re.search(r"```(json|mongodb)\s*([\s\S]*?)```", text, re.IGNORECASE)
+            if match:
+                cleaned_text = match.group(2).strip()
+            else:
+                # If no code block, try to parse the whole text as JSON as a fallback
+                # or maybe it's just raw JSON without backticks
+                cleaned_text = text.strip()
+
             try:
-                json.loads(text)
-                return GeneratedQuery(raw_query=text, query_type="mongo_json")
+                json.loads(cleaned_text)
+                return GeneratedQuery(raw_query=cleaned_text, query_type="mongo_json")
             except json.JSONDecodeError:
+                # Fallback: Check if it's a JS-style query like db.users.find({...})
+                # Pattern: db.collection.find(filter)
+                js_find_pattern = r"db\.(\w+)\.find\((.*)\)"
+                js_agg_pattern = r"db\.(\w+)\.aggregate\((.*)\)"
+                
+                find_match = re.search(js_find_pattern, cleaned_text, re.DOTALL)
+                agg_match = re.search(js_agg_pattern, cleaned_text, re.DOTALL)
+                
+                if find_match:
+                    collection = find_match.group(1)
+                    filter_str = find_match.group(2).strip()
+                    if not filter_str: 
+                        filter_str = "{}"
+                    # Try to ensure the filter string is valid JSON
+                    try:
+                        # If it's just {}, it's valid
+                        # If keys are not quoted (e.g. {name: "foo"}), json.loads will fail.
+                        # This constitutes a best-effort fix.
+                        import demjson3 # If available, or use simple regex fix
+                        # For now, let's assume LLM gives valid JSON inside parens or clean it up
+                        pass 
+                    except:
+                        pass
+                        
+                    # Construct our internal JSON format
+                    reconstructed_json = json.dumps({
+                        "collection": collection,
+                        "operation": "find",
+                        "filter": json.loads(filter_str) if filter_str else {}
+                    })
+                    return GeneratedQuery(raw_query=reconstructed_json, query_type="mongo_json")
+
+                elif agg_match:
+                    collection = agg_match.group(1)
+                    pipeline_str = agg_match.group(2).strip()
+                    reconstructed_json = json.dumps({
+                        "collection": collection,
+                        "operation": "aggregate",
+                        "pipeline": json.loads(pipeline_str) if pipeline_str else []
+                    })
+                    return GeneratedQuery(raw_query=reconstructed_json, query_type="mongo_json")
+
                 return GeneratedQuery(
-                    raw_query=text,
-                    error="LLM did not return a valid JSON object for the MongoDB query.",
+                    raw_query=cleaned_text,
+                    error="LLM returned invalid format. Expected JSON or valid MongoDB JS query.",
                     query_type="mongo_json",
                 )
         else:
@@ -459,11 +566,17 @@ class LLMService:
             query_block_tag = "sql"
         elif engine == "redis":
             query_block_tag = "redis"
+        elif engine == "mongodb":
+            query_block_tag = "json"
         else:
             query_block_tag = "text"
 
         pattern = rf"```{query_block_tag}\s*([\s\S]*?)```"
         match = re.search(pattern, text, re.IGNORECASE)
+
+        # Fallback for mongodb if json tag was expected but mongodb tag was used
+        if not match and engine == "mongodb":
+             match = re.search(r"```(mongodb|javascript|js)\s*([\s\S]*?)```", text, re.IGNORECASE)
         
         if match:
             query = match.group(1).strip()
