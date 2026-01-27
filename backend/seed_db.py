@@ -120,6 +120,34 @@ async def seed_db(target_db: str = None):
                 print("MongoDB seeding completed.")
                 continue
 
+            elif engine == "redis":
+                seed_file = "redis_seed.txt"
+                full_path = os.path.join(seed_dir, seed_file)
+                print(f"Reading seed file: {full_path}")
+                
+                if not os.path.exists(full_path):
+                    print(f"Error: Seed file not found at {full_path}")
+                    continue
+
+                with open(full_path, 'r') as f:
+                    lines = f.readlines()
+
+                print(f"Executing Redis commands from {seed_file}...")
+                for line in lines:
+                    line = line.strip()
+                    # Skip empty lines and comments
+                    if not line or line.startswith("#"):
+                        continue
+                    
+                    try:
+                        # Redis connector expects the full command string
+                        await connector.execute_query(line)
+                    except Exception as e:
+                        print(f"Error executing Redis command '{line}': {e}")
+                
+                print("Redis seeding completed.")
+                continue
+
             elif engine == "sqlite":
                 # Assuming sqlite might use postgres syntax or has its own
                 # For now, let's skip or try postgres if compatible

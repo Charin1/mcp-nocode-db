@@ -32,13 +32,13 @@ databases:
     dbname: "nocode_test_db"
     allow_mutations: true
 
-  # redis_docker:
-  #   name: "Redis (Docker)"
-  #   engine: "redis"
-  #   host: "localhost" # Docker service name
-  #   port: 6379
-  #   db: 0
-  #   allow_mutations: true
+  redis_local:
+    name: "Redis (Local)"
+    engine: "redis"
+    host: "localhost"
+    port: 6379
+    db: 0
+    allow_mutations: true
 
   # --- Examples for other databases (uncomment and configure if needed) ---
   #

@@ -129,6 +129,8 @@ source .venv/bin/activate
 python seed_db.py --db mysql_local
 # OR
 python seed_db.py --db postgres_docker
+# OR
+python seed_db.py --db redis_local
 ```
 
 ---
