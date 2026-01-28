@@ -61,13 +61,47 @@ cd mcp-nocode-db
 ```
 
 **Backend Setup**
+
+Navigate to the `backend` directory and set up your virtual environment.
+
+**Example Scripts (Choose your OS):**
+
+<details>
+<summary><strong>macOS / Linux (Ubuntu)</strong></summary>
+
 ```bash
 cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+</details>
 
-# Configure Environment
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+</details>
+
+<details>
+<summary><strong>Windows (Command Prompt)</strong></summary>
+
+```cmd
+cd backend
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+</details>
+
+**Configure Environment**
+```bash
+# All Platforms
 cp .env.example .env
 # Add your API keys (GOOGLE_API_KEY, OPENAI_API_KEY, etc.) inside .env
 ```
@@ -146,9 +180,14 @@ python seed_db.py --db redis_local
 
 ## 🛠️ Roadmap
 
-*   [x] **Enable Multi-Database Support:** Support for MongoDB and Redis.
-*   [x] **Local SQLite Support:** Run without Docker.
-*   [x] **Backend Refactoring:** Adopt SQLAlchemy & Dependency Injection.
-*   [x] **Visual Enhancements:** Professional "AI" look and feel.
-*   [ ] **Production Hardening:** Move secrets to a secure vault.
-*   [ ] **Advanced Data Visualizations:** More chart types.
+### ✅ Completed
+*   **Core Multi-Database Support:** PostgreSQL, MySQL, MongoDB, Redis, SQLite.
+*   **Robust Authentication:** Secure JWT-based auth with Role-Based Access Control (RBAC).
+*   **Cross-Platform Compatibility:** Universal setup for Windows, macOS, and Linux.
+*   **Advanced LLM Integration:** Support for Gemini, Groq.
+*   **MCP Protocol Implementation:** Initial support for Model Context Protocol compliance.
+
+### 🚀 Upcoming
+*   [ ] **Production Deployment:** Docker Compose orchestration and cloud deployment guides.
+*   [ ] **Plugin System:** Allow community extensions for new database types.
+*   [ ] **Data Visualization Suite:** Extended library of auto-generated charts and dashboards.

@@ -6,7 +6,7 @@ from typing import Optional, List
 from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 
 from models.auth import User, UserInDB, TokenData
 
@@ -15,7 +15,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context removed in favor of direct bcrypt usage
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 # --- User Database Functions ---
@@ -89,11 +89,17 @@ def get_total_users() -> int:
 
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    if isinstance(plain_password, str):
+        plain_password = plain_password.encode('utf-8')
+    if isinstance(hashed_password, str):
+        hashed_password = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(plain_password, hashed_password)
 
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    if isinstance(password, str):
+        password = password.encode('utf-8')
+    return bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8')
 
 
 def authenticate_user(username: str, password: str) -> Optional[User]:
