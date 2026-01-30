@@ -171,10 +171,12 @@ python seed_db.py --db redis_local
 
 ## 💻 Tech Stack
 
-*   **Backend:** Python 3.13+, FastAPI, SQLAlchemy (Async), Pydantic, Arq (Redis), Tenacity
-*   **Frontend:** React 18, Vite, TailwindCSS, Zustand, Framer Motion (styled)
+*   **Backend:** Python 3.13+, FastAPI, SQLAlchemy (Async), Pydantic v2, Arq (Redis), Tenacity, HTTPX
+*   **Database Drivers:** asyncpg (PostgreSQL), PyMySQL (MySQL), Motor/PyMongo (MongoDB), Redis, aiosqlite (SQLite), Elasticsearch, BigQuery
+*   **Frontend:** React 18, Vite 5, TailwindCSS, Zustand, Recharts, AG Grid, Axios, React Router v6
 *   **AI:** Google Gemini, OpenAI, Groq
 *   **Protocol:** Model Context Protocol (MCP)
+*   **Auth:** JWT (python-jose), bcrypt
 
 ---
 
