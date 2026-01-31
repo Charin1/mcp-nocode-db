@@ -183,6 +183,7 @@ async def send_message(
     session_id: int, 
     message: ChatMessage, 
     model_provider: str = "gemini",
+    scope: Optional[str] = Query(None),
     active_mcp_ids: Optional[List[str]] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -263,9 +264,25 @@ async def send_message(
                     content=db_msg.content,
                     query=db_msg.query
                 ))
-                
-            schema = await db_manager.get_schema_for_prompt(session.db_id)
-            db_engine = db_manager.get_db_engine(session.db_id)
+            
+            if scope == "all":
+                # Multi-DB Mode: Scoped to the SAME ENGINE as the current session DB
+                try:
+                    current_engine = db_manager.get_db_engine(session.db_id)
+                    schema = await db_manager.get_all_schemas_for_prompt(engine_filter=current_engine)
+                    db_engine = "multi-db" # Triggers routing prompt
+                except Exception as e:
+                     # Fallback if session DB is invalid or "ALL" legacy
+                     print(f"Warning: Could not determine engine for scoping: {e}")
+                     schema = await db_manager.get_all_schemas_for_prompt() # Fallback to everything
+                     db_engine = "multi-db"
+            elif session.db_id == "ALL":
+                # Legacy handling for sessions created with ALL
+                schema = await db_manager.get_all_schemas_for_prompt()
+                db_engine = "multi-db"
+            else:
+                schema = await db_manager.get_schema_for_prompt(session.db_id)
+                db_engine = db_manager.get_db_engine(session.db_id)
             
             # Generate Response
             print(f"Calling LLM: {model_provider} with {len(context_messages)} messages...")

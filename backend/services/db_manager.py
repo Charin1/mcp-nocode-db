@@ -144,6 +144,57 @@ class DbManager:
              print(f"DEBUG: SQL Execution Result: {result.keys()}")
         return result
 
+    async def get_all_schemas(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary of schemas for all configured databases.
+        Format: { "db_id": { "name": "DB Name", "schema": ... } }
+        """
+        all_schemas = {}
+        for db_id, connector in self._connectors.items():
+            try:
+                # We need the friendly name from config
+                db_config = self.get_db_config(db_id)
+                db_name = db_config.get("name", db_id)
+                schema = await connector.get_schema()
+                all_schemas[db_id] = {
+                    "name": db_name,
+                    "engine": db_config.get("engine"),
+                    "schema": schema
+                }
+            except Exception as e:
+                print(f"Error fetching schema for {db_id}: {e}")
+                # We optionally include error info or skip
+                all_schemas[db_id] = {
+                    "name": self.get_db_config(db_id).get("name", db_id),
+                    "error": str(e)
+                }
+        return all_schemas
+
+    async def get_all_schemas_for_prompt(self, engine_filter: str = None) -> str:
+        """
+        Returns a formatted string containing schemas from ALL databases, suitable for LLM prompt.
+        If engine_filter is provided, only includes databases with that engine type.
+        """
+        prompt_parts = []
+        for db_id, connector in self._connectors.items():
+            try:
+                db_config = self.get_db_config(db_id)
+                
+                # Filter by engine if specified
+                if engine_filter and db_config.get("engine") != engine_filter:
+                    continue
+
+                db_name = db_config.get("name", db_id)
+                schema_str = await connector.get_schema_for_prompt()
+                
+                prompt_parts.append(f"--- Database: {db_name} (ID: {db_id}, Engine: {db_config.get('engine')}) ---")
+                prompt_parts.append(schema_str)
+                prompt_parts.append("\n")
+            except Exception as e:
+                print(f"Error fetching schema prompt for {db_id}: {e}")
+        
+        return "\n".join(prompt_parts)
+
     def is_mutation_query(self, db_id: str, query: str) -> bool:
         connector = self.get_connector(db_id)
         return connector.is_mutation(query)

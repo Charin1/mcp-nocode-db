@@ -8,6 +8,8 @@ export const useDbStore = create((set, get) => ({
   selectedDbId: null,
   selectedLlmProvider: 'gemini',
   schema: [],
+  globalSchema: {}, // { db_id: { name: "", schema: [] } }
+  scope: 'current', // 'current' or 'all'
   isLoadingSchema: false,
   queryResult: null,
   isQuerying: false,
@@ -34,20 +36,42 @@ export const useDbStore = create((set, get) => ({
 
   setSelectedDbId: (dbId) => {
     set({ selectedDbId: dbId, schema: [], queryResult: null, generatedQuery: null });
-    get().fetchSchema();
+    if (dbId !== 'ALL') {
+      get().fetchSchema();
+    }
+  },
+
+  setScope: (scope) => {
+    set({ scope });
+    if (scope === 'all') {
+      // Don't overwrite selectedDbId, just fetch global schema
+      get().fetchGlobalSchema();
+    }
   },
 
   setSelectedLlmProvider: (provider) => set({ selectedLlmProvider: provider }),
 
   fetchSchema: async (dbId = null) => {
     const finalDbId = dbId || get().selectedDbId;
-    if (!finalDbId) return;
+    if (!finalDbId || finalDbId === 'ALL') return;
     set({ isLoadingSchema: true, schema: [] });
     try {
       const response = await apiClient.get(`/api/schema/${finalDbId}`);
       set({ schema: response.data });
     } catch (error) {
       toast.error(`Failed to fetch schema for ${finalDbId}.`);
+    } finally {
+      set({ isLoadingSchema: false });
+    }
+  },
+
+  fetchGlobalSchema: async () => {
+    set({ isLoadingSchema: true });
+    try {
+      const response = await apiClient.get('/api/schemas');
+      set({ globalSchema: response.data });
+    } catch (error) {
+      toast.error("Failed to fetch global schemas.");
     } finally {
       set({ isLoadingSchema: false });
     }
@@ -91,17 +115,17 @@ export const useDbStore = create((set, get) => ({
         confirm_execute: true,
       });
       set({ queryResult: response.data });
-       if (response.data.error) {
+      if (response.data.error) {
         toast.error(response.data.error);
       } else {
         toast.success("Query executed successfully!");
       }
     } catch (error) {
       if (error.response && error.response.status === 422) {
-          toast.error("Unprocessable Content: The request from the UI is missing required data.");
-          console.error("422 Error Detail:", error.response.data.detail);
+        toast.error("Unprocessable Content: The request from the UI is missing required data.");
+        console.error("422 Error Detail:", error.response.data.detail);
       } else {
-          toast.error("Failed to execute query.");
+        toast.error("Failed to execute query.");
       }
     } finally {
       set({ isQuerying: false });

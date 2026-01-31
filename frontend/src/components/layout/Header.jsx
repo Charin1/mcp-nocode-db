@@ -4,12 +4,26 @@ import { useAuth } from 'context/AuthContext'; // <-- THIS IS THE CORRECTED LINE
 import { UserCircleIcon, ArrowLeftOnRectangleIcon } from '@heroicons/react/24/solid';
 
 const Header = () => {
-  const { databases, llmProviders, selectedDbId, selectedLlmProvider, setSelectedDbId, setSelectedLlmProvider } = useDbStore();
+  const { databases, llmProviders, selectedDbId, selectedLlmProvider, setSelectedDbId, setSelectedLlmProvider, scope, setScope } = useDbStore();
   const { user, logout } = useAuth();
 
   return (
     <header className="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-700">
       <div className="flex items-center space-x-4">
+        {/* Scope Selector */}
+        <div>
+          <label htmlFor="scope-selector" className="text-xs font-medium text-gray-400">SCOPE</label>
+          <select
+            id="scope-selector"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            className="w-32 p-2 text-sm text-white bg-gray-800 border border-gray-600 rounded-md focus:ring-brand-blue focus:border-brand-blue"
+          >
+            <option value="current">Current DB</option>
+            <option value="all">All Databases</option>
+          </select>
+        </div>
+
         {/* Database Selector */}
         <div>
           <label htmlFor="db-selector" className="text-xs font-medium text-gray-400">DATABASE</label>

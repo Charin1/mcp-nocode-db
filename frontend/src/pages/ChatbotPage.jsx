@@ -15,7 +15,6 @@ const ChatbotPage = () => {
     };
 
     // State
-    // State
     const [messages, setMessages] = useState([defaultMessage]);
     const [sessions, setSessions] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -27,9 +26,10 @@ const ChatbotPage = () => {
 
     // Refs & Store
     const chatEndRef = useRef(null);
-    const { selectedDbId, llmProvider } = useDbStore(state => ({
+    const { selectedDbId, llmProvider, scope } = useDbStore(state => ({
         selectedDbId: state.selectedDbId,
         llmProvider: state.selectedLlmProvider,
+        scope: state.scope,
     }));
 
     // --- Effects ---
@@ -239,6 +239,9 @@ const ChatbotPage = () => {
             // Construct query params
             const params = new URLSearchParams();
             params.append('model_provider', llmProvider || 'gemini');
+            if (scope) {
+                params.append('scope', scope);
+            }
 
             // Add active MCP IDs
             const activeMcpIds = useMcpStore.getState().activeConnectionIds;

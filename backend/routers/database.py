@@ -36,6 +36,19 @@ async def get_database_schema(db_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve schema: {e}")
 
 
+@router.get("/schemas", response_model=Dict[str, Any])
+async def get_all_schemas():
+    """
+    Returns the schema for ALL configured databases.
+    """
+    try:
+        manager = DbManager()
+        schemas = await manager.get_all_schemas()
+        return schemas
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve all schemas: {e}")
+
+
 @router.get("/sample_data/{db_id}/{object_name}", response_model=Dict[str, Any])
 async def get_sample_data(db_id: str, object_name: str):
     """

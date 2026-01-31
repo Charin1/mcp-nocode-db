@@ -214,9 +214,41 @@ class LLMService:
         elif engine == "mongodb":
             query_language = "MongoDB query (JSON)"
             query_block_tag = "json"
+        elif engine == "multi-db":
+            query_language = "Query with DB_ID prefix"
+            query_block_tag = "text"
         else:
             query_language = f"{engine} query"
             query_block_tag = "text"
+
+        if engine == "multi-db":
+             return f"""
+            You are an intelligent Database Router and Query Generator.
+            You have access to valid schemas from multiple databases.
+
+            ### Instructions
+            1.  **Analyze**: Look at the user's request and the "Internal Database Connection Schemas" below.
+            2.  **Identify**: Determine which specific database contains the tables or data needed.
+            3.  **Generate**: Write the valid query for that database's specific engine (SQL, MongoDB, Redis, etc.).
+            4.  **Format**: You MUST output the query with the Database ID prefix.
+                Format:
+                ```
+                DB_ID: <db_id_from_schema>
+                <query>
+                ```
+                Example:
+                ```
+                DB_ID: users_db
+                SELECT * FROM users WHERE active = true;
+                ```
+
+            {tools_instruction}
+            ### Internal Database Connection Schemas
+            {schema}
+            ### Conversation History
+            {history}
+            ### Your Response
+            """
 
         return f"""
             You are an expert MongoDB Query Generator. 
@@ -568,11 +600,18 @@ class LLMService:
             query_block_tag = "redis"
         elif engine == "mongodb":
             query_block_tag = "json"
+        elif engine == "multi-db":
+            # For multi-db, we accept sql or text, but let's try sql first as most common
+            query_block_tag = "sql"
         else:
             query_block_tag = "text"
 
         pattern = rf"```{query_block_tag}\s*([\s\S]*?)```"
         match = re.search(pattern, text, re.IGNORECASE)
+
+        # Fallback for multi-db if sql tag not found, try generic or text
+        if not match and engine == "multi-db":
+             match = re.search(r"```(text|)\s*([\s\S]*?)```", text, re.IGNORECASE)
 
         # Fallback for mongodb if json tag was expected but mongodb tag was used
         if not match and engine == "mongodb":
@@ -591,6 +630,14 @@ class LLMService:
         
         if generic_match:
             potential_query = generic_match.group(1).strip()
+            # If multi-db, we trust the block if it has DB_ID: inside
+            if engine == "multi-db" and "DB_ID:" in potential_query:
+                 return ChatMessage(
+                    role="assistant",
+                    content="I have generated a query for you. Please review and confirm if you would like to execute it.",
+                    query=potential_query,
+                )
+
             sql_keywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "WITH", "CREATE", "ALTER", "DROP", "SHOW", "DESCRIBE"]
             if any(potential_query.upper().startswith(kw) for kw in sql_keywords):
                 return ChatMessage(

@@ -22,13 +22,29 @@ const getIcon = (type) => {
 };
 
 const Sidebar = () => {
-  const { schema, isLoadingSchema } = useDbStore();
+  const { schema, isLoadingSchema, scope, globalSchema, selectedDbId, databases } = useDbStore();
   const { connections, fetchConnections, deleteConnection, isLoading, activeConnectionIds, toggleActiveConnection } = useMcpStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expandedDbs, setExpandedDbs] = useState({});
 
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
+
+  const toggleDbExpand = (dbId) => {
+    setExpandedDbs(prev => ({ ...prev, [dbId]: !prev[dbId] }));
+  };
+
+  const renderSchemaList = (items) => (
+    <ul className="space-y-1 ml-2 border-l border-gray-700 pl-2">
+      {items.map(item => (
+        <li key={item.name} className="flex items-center px-2 py-1.5 text-sm text-gray-300 rounded-md cursor-pointer hover:bg-gray-700 transition-colors">
+          {getIcon(item.type)}
+          <span className="truncate">{item.name}</span>
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <>
@@ -36,7 +52,9 @@ const Sidebar = () => {
         {/* Database Schema Section */}
         <div className="flex-1 flex flex-col min-h-0 border-b border-gray-700">
           <div className="px-4 py-3 border-b border-gray-700 bg-gray-800">
-            <h2 className="text-lg font-semibold text-white">Schema Explorer</h2>
+            <h2 className="text-lg font-semibold text-white">
+              {scope === 'all' ? 'All Databases' : 'Schema Explorer'}
+            </h2>
           </div>
           <div className="flex-1 p-2 overflow-y-auto">
             {isLoadingSchema ? (
@@ -44,16 +62,54 @@ const Sidebar = () => {
                 <Spinner />
               </div>
             ) : (
-              <ul className="space-y-1">
-                {schema.length > 0 ? schema.map(item => (
-                  <li key={item.name} className="flex items-center px-2 py-1.5 text-sm text-gray-300 rounded-md cursor-pointer hover:bg-gray-700 transition-colors">
-                    {getIcon(item.type)}
-                    <span className="truncate">{item.name}</span>
-                  </li>
-                )) : (
-                  <li className="px-2 py-4 text-xs text-center text-gray-500">No schema found or database not selected.</li>
-                )}
-              </ul>
+              scope === 'all' ? (
+                // All Databases Tree View
+                Object.keys(globalSchema).length > 0 ? (
+                  <ul className="space-y-2">
+                    {Object.entries(globalSchema)
+                      .filter(([dbId, dbData]) => {
+                        // Filter by engine of selected DB
+                        const selectedDb = databases.find(d => d.id === selectedDbId);
+                        const currentEngine = selectedDb?.engine;
+
+                        if (!currentEngine) return true; // Show all if no selection/unknown
+                        return dbData.engine === currentEngine;
+                      })
+                      .map(([dbId, dbData]) => (
+                        <li key={dbId}>
+                          <div
+                            className="flex items-center px-2 py-2 text-sm font-medium text-white rounded-md cursor-pointer hover:bg-gray-800"
+                            onClick={() => toggleDbExpand(dbId)}
+                          >
+                            <span className="mr-2 text-gray-400">
+                              {expandedDbs[dbId] ? '▼' : '▶'}
+                            </span>
+                            <span className="truncate">{dbData.name}</span>
+                          </div>
+                          {expandedDbs[dbId] && dbData.schema && (
+                            renderSchemaList(dbData.schema)
+                          )}
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <div className="px-2 py-4 text-xs text-center text-gray-500">No databases found.</div>
+                )
+              ) : (
+                // Current DB View
+                schema.length > 0 ? (
+                  <ul className="space-y-1">
+                    {schema.map(item => (
+                      <li key={item.name} className="flex items-center px-2 py-1.5 text-sm text-gray-300 rounded-md cursor-pointer hover:bg-gray-700 transition-colors">
+                        {getIcon(item.type)}
+                        <span className="truncate">{item.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <li className="list-none px-2 py-4 text-xs text-center text-gray-500">No schema found or database not selected.</li>
+                )
+              )
             )}
           </div>
         </div>

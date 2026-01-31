@@ -74,13 +74,32 @@ async def execute_raw_query(
     db_manager = DbManager()
     audit_service = AuditService(db)
 
-    db_config = db_manager.get_db_config(request.db_id)
-    if not db_config:
-        raise HTTPException(
-            status_code=404, detail=f"Database '{request.db_id}' not found."
+    # Multi-DB Logic: Parse real DB_ID if scope is ALL
+    real_db_id = request.db_id
+    final_query = request.raw_query.strip()
+
+    # Multi-DB Logic: Check for DB_ID: <id> prefix regardless of request.db_id
+    # This allows LLM to route to a different DB than the one selected in UI (if in 'All' scope)
+    import re
+    match = re.match(r"^DB_ID:\s*([a-zA-Z0-9_-]+)\s*\n?", final_query, re.IGNORECASE)
+    
+    if match:
+        real_db_id = match.group(1).strip()
+        final_query = final_query[match.end():].strip()
+    elif request.db_id == "ALL":
+         # Fallback error if we expected routing but got none and db_id is still ALL
+         raise HTTPException(
+            status_code=400, 
+            detail="Multi-Database Execution Error: Could not identify target database. Query must start with 'DB_ID: <id>'."
         )
 
-    is_mutation = db_manager.is_mutation_query(request.db_id, request.raw_query)
+    db_config = db_manager.get_db_config(real_db_id)
+    if not db_config:
+        raise HTTPException(
+            status_code=404, detail=f"Database '{real_db_id}' not found."
+        )
+
+    is_mutation = db_manager.is_mutation_query(real_db_id, final_query)
 
     if is_mutation:
         if not db_config.get("allow_mutations"):
@@ -100,25 +119,25 @@ async def execute_raw_query(
             )
 
     try:
-        result = await db_manager.execute_query(request.db_id, request.raw_query)
+        result = await db_manager.execute_query(real_db_id, final_query)
 
         await audit_service.log(
             username=current_user.username,
-            db_id=request.db_id,
+            db_id=real_db_id,
             natural_query=request.natural_language_query,
-            generated_query=request.raw_query,
+            generated_query=final_query,
             executed=True,
             success=True,
             rows_returned=result.get("rows_affected", 0),
         )
-        return QueryResult(**result, query_executed=request.raw_query)
+        return QueryResult(**result, query_executed=final_query)
 
     except Exception as e:
         await audit_service.log(
             username=current_user.username,
-            db_id=request.db_id,
+            db_id=real_db_id,
             natural_query=request.natural_language_query,
-            generated_query=request.raw_query,
+            generated_query=final_query,
             executed=True,
             success=False,
             error=str(e),
