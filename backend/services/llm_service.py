@@ -205,22 +205,6 @@ class LLMService:
             Final Answer: [your response here]
             """
 
-        if engine in ["postgresql", "mysql", "sqlite"]:
-            query_language = "SQL query"
-            query_block_tag = "sql"
-        elif engine == "redis":
-            query_language = "Redis command"
-            query_block_tag = "redis"
-        elif engine == "mongodb":
-            query_language = "MongoDB query (JSON)"
-            query_block_tag = "json"
-        elif engine == "multi-db":
-            query_language = "Query with DB_ID prefix"
-            query_block_tag = "text"
-        else:
-            query_language = f"{engine} query"
-            query_block_tag = "text"
-
         if engine == "multi-db":
              return f"""
             You are an intelligent Database Router and Query Generator.
@@ -250,7 +234,43 @@ class LLMService:
             ### Your Response
             """
 
-        return f"""
+        elif engine in ["postgresql", "mysql", "sqlite"]:
+            return f"""
+            You are an expert SQL Query Generator for a {engine.upper()} database.
+            You are NOT a conversational assistant. You are a code generation engine.
+            Your ONLY purpose is to output valid SQL queries.
+
+            ### Instructions
+            1.  **Response Format**:
+                - Output the SQL query inside ```sql``` markdown blocks.
+                - **NO** introductory text (e.g., "Here is the query").
+                - **NO** explaining the query unless asked.
+                - **ONLY** the SQL block when generating a query.
+
+            2.  **Orchestration**:
+                - If the user asks for data, generate a SQL SELECT query.
+                - **ONLY generate SELECT statements.** Never generate INSERT, UPDATE, DELETE, DROP, or DDL.
+                - If the user asks a general question *unrelated* to data retrieval, you may answer briefly.
+
+            3.  **SQL Query Guidelines**:
+                - Use proper JOIN syntax when combining tables.
+                - Use appropriate WHERE clauses for filtering.
+                - Use ORDER BY for sorting, LIMIT for pagination.
+                - Use aggregate functions (COUNT, SUM, AVG, etc.) when needed.
+
+            4.  **Context**:
+                - Use the provided conversation history for context.
+
+            {tools_instruction}
+            ### Internal Database Schema
+            {schema}
+            ### Conversation History
+            {history}
+            ### Your Response
+            """
+
+        elif engine == "mongodb":
+            return f"""
             You are an expert MongoDB Query Generator. 
             You are NOT a conversational assistant. You are a code generation engine.
             Your ONLY purpose is to output valid JSON configuration for MongoDB queries.
@@ -285,17 +305,47 @@ class LLMService:
             ### Your Response
             """
 
-    def _build_chat_system_prompt(self, schema: str, engine: str, tools: List[Dict[str, Any]] = None) -> str:
-        if engine in ["postgresql", "mysql", "sqlite"]:
-            query_language = "SQL query"
-            query_block_tag = "sql"
         elif engine == "redis":
-            query_language = "Redis command"
-            query_block_tag = "redis"
-        else:
-            query_language = f"{engine} query"
-            query_block_tag = "text"
+            return f"""
+            You are an expert Redis Command Generator.
+            You are NOT a conversational assistant. You are a code generation engine.
+            Your ONLY purpose is to output valid Redis CLI commands.
 
+            ### Instructions
+            1.  **Response Format**:
+                - Output the Redis command inside ```redis``` markdown blocks.
+                - **NO** introductory text.
+                - **ONLY** the command.
+
+            2.  **Orchestration**:
+                - If the user asks for data, generate the appropriate Redis command.
+                - Common commands: GET, SET, HGETALL, HGET, HSET, KEYS, SCAN, LRANGE, etc.
+
+            {tools_instruction}
+            ### Internal Database Schema (Sample Keys)
+            {schema}
+            ### Conversation History
+            {history}
+            ### Your Response
+            """
+
+        else:
+            # Fallback for unknown engines
+            return f"""
+            You are a helpful database query assistant for a {engine} database.
+            
+            ### Instructions
+            Generate appropriate queries based on the user's request.
+            
+            {tools_instruction}
+            ### Database Schema
+            {schema}
+            ### Conversation History
+            {history}
+            ### Your Response
+            """
+
+    def _build_chat_system_prompt(self, schema: str, engine: str, tools: List[Dict[str, Any]] = None) -> str:
         tools_instruction = ""
         if tools:
             import json
@@ -316,7 +366,40 @@ class LLMService:
             Final Answer: [your response here]
             """
 
-        return f"""
+        if engine in ["postgresql", "mysql", "sqlite"]:
+            return f"""
+            You are an expert SQL Query Generator for a {engine.upper()} database.
+            You are NOT a conversational assistant. You are a code generation engine.
+            Your ONLY purpose is to output valid SQL queries.
+
+            ### Instructions
+            1.  **Response Format**:
+                - Output the SQL query inside ```sql``` markdown blocks.
+                - **NO** introductory text (e.g., "Here is the query").
+                - **NO** explaining the query unless asked.
+                - **ONLY** the SQL block when generating a query.
+
+            2.  **Orchestration**:
+                - If the user asks for data, generate a SQL SELECT query.
+                - **ONLY generate SELECT statements.** Never generate INSERT, UPDATE, DELETE, DROP, or DDL.
+                - If the user asks a general question *unrelated* to data retrieval, you may answer briefly.
+
+            3.  **SQL Query Guidelines**:
+                - Use proper JOIN syntax when combining tables.
+                - Use appropriate WHERE clauses for filtering.
+                - Use ORDER BY for sorting, LIMIT for pagination.
+                - Use aggregate functions (COUNT, SUM, AVG, etc.) when needed.
+
+            4.  **Context**:
+                - Use the provided conversation history for context.
+
+            {tools_instruction}
+            ### Internal Database Schema
+            {schema}
+            """
+
+        elif engine == "mongodb":
+            return f"""
             You are an expert MongoDB Query Generator. 
             You are NOT a conversational assistant. You are a code generation engine.
             Your ONLY purpose is to output valid JSON configuration for MongoDB queries.
@@ -349,6 +432,39 @@ class LLMService:
 
             {tools_instruction}
             ### Internal Database Schema
+            {schema}
+            """
+
+        elif engine == "redis":
+            return f"""
+            You are an expert Redis Command Generator.
+            You are NOT a conversational assistant. You are a code generation engine.
+            Your ONLY purpose is to output valid Redis CLI commands.
+
+            ### Instructions
+            1.  **Response Format**:
+                - Output the Redis command inside ```redis``` markdown blocks.
+                - **NO** introductory text.
+                - **ONLY** the command.
+
+            2.  **Orchestration**:
+                - If the user asks for data, generate the appropriate Redis command.
+                - Common commands: GET, SET, HGETALL, HGET, HSET, KEYS, SCAN, LRANGE, etc.
+
+            {tools_instruction}
+            ### Internal Database Schema (Sample Keys)
+            {schema}
+            """
+
+        else:
+            return f"""
+            You are a helpful database query assistant for a {engine} database.
+            
+            ### Instructions
+            Generate appropriate queries based on the user's request.
+            
+            {tools_instruction}
+            ### Database Schema
             {schema}
             """
 

@@ -51,3 +51,4 @@ arq
 tenacity
 aiosqlite
 greenlet
+faster-whisper

@@ -7,7 +7,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.auth import User
-from routers import auth, database, query, admin, chatbot, saved_query, mcp_connection
+from routers import auth, database, query, admin, chatbot, saved_query, mcp_connection, transcription
 from mcp_server import mcp
 from services.audit_service import AuditService
 from services.security import get_current_user, has_role, create_initial_admin_user
@@ -92,6 +92,11 @@ app.include_router(
     prefix="/api/mcp-connections",
     tags=["MCP Connections"],
     dependencies=[Depends(get_current_user)],
+)
+app.include_router(
+    transcription.router,
+    tags=["Transcription"],
+    # No auth required for transcription, add Depends(get_current_user) if needed
 )
 app.mount("/api/mcp", mcp.sse_app())
 

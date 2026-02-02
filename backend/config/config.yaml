@@ -8,7 +8,7 @@ databases:
     host: "localhost"
     port: 5432
     user: "postgres"
-    password: "your_postgres_password"
+    password: "mlp123"
     dbname: "sampledb"
     allow_mutations: true # Set to true for admin testing
 
@@ -48,7 +48,7 @@ databases:
     host: "localhost"
     port: 3306
     user: "root"
-    password: "your_mysql_password"
+    password: "mlp123456"
     dbname: "sampledb"
     allow_mutations: false
   #
