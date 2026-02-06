@@ -12,7 +12,7 @@ const Dashboard = () => {
   }, [fetchAppConfig]);
 
   return (
-    <div className="flex h-screen bg-gray-800 text-gray-200 font-sans">
+    <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans transition-colors">
       <Sidebar />
       <div className="flex flex-col flex-1">
         <Header />

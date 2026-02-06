@@ -364,7 +364,7 @@ const ChatbotPage = () => {
     };
 
     return (
-        <div className="flex h-full bg-[#0f1117] text-gray-100 font-sans overflow-hidden">
+        <div className="flex h-full bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans overflow-hidden transition-colors">
             {/* Sidebar (Session List) */}
             <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block h-full`}>
                 <SessionList
@@ -386,8 +386,8 @@ const ChatbotPage = () => {
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col relative h-full min-w-0">
                 {/* Mobile Header / Toggle */}
-                <div className="md:hidden p-4 border-b border-gray-800 flex items-center">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-400">
+                <div className="md:hidden p-4 border-b border-[var(--border-color)] flex items-center">
+                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-[var(--text-muted)]">
                         <Bars3Icon className="w-6 h-6" />
                     </button>
                     <span className="ml-4 font-semibold">Chat</span>
@@ -429,7 +429,7 @@ const ChatbotPage = () => {
                 </div>
 
                 {/* Input Area */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#0f1117] via-[#0f1117] to-transparent pt-10 px-4 pb-4">
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent pt-10 px-4 pb-4">
                     <div className="max-w-4xl mx-auto">
                         <ChatInput
                             value={userInput}

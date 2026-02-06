@@ -41,7 +41,7 @@ const ChatInput = ({ value, onChange, onSubmit, isLoading, disabled, placeholder
             <form
                 onSubmit={onSubmit}
                 className={`
-                    relative flex items-end p-2 bg-[#0d1117] border border-gray-700/50 rounded-3xl shadow-xl transition-all duration-300
+                    relative flex items-end p-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-3xl shadow-xl transition-all duration-300
                     focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:shadow-[0_0_20px_rgba(99,102,241,0.15)]
                     ${disabled ? 'opacity-70 cursor-not-allowed' : ''}
                     ${isRecording ? 'border-red-500/50 ring-2 ring-red-500/20' : ''}
@@ -53,7 +53,7 @@ const ChatInput = ({ value, onChange, onSubmit, isLoading, disabled, placeholder
                     onChange={onChange}
                     onKeyDown={handleKeyDown}
                     placeholder={isRecording ? "Recording..." : (placeholder || "What's in your mind?")}
-                    className="w-full bg-transparent text-gray-200 placeholder-gray-500 text-[15px] resize-none focus:outline-none py-3 px-4 max-h-[150px] overflow-y-auto rounded-2xl"
+                    className="w-full bg-transparent text-[var(--text-primary)] placeholder-[var(--text-muted)] text-[15px] resize-none focus:outline-none py-3 px-4 max-h-[150px] overflow-y-auto rounded-2xl"
                     rows={1}
                     disabled={disabled || isRecording}
                 />
@@ -70,7 +70,7 @@ const ChatInput = ({ value, onChange, onSubmit, isLoading, disabled, placeholder
                             ? 'bg-red-600 text-white animate-pulse shadow-lg shadow-red-500/30'
                             : isTranscribing
                                 ? 'bg-amber-600 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'
+                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
                         }
                         ${disabled ? 'cursor-not-allowed opacity-50' : ''}
                     `}
@@ -91,7 +91,7 @@ const ChatInput = ({ value, onChange, onSubmit, isLoading, disabled, placeholder
                     className={`
                         mb-1.5 mr-1.5 p-2 rounded-xl transition-all duration-200
                         ${!value.trim() || disabled || isRecording
-                            ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                            ? 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
                             : 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500'
                         }
                     `}
@@ -106,7 +106,7 @@ const ChatInput = ({ value, onChange, onSubmit, isLoading, disabled, placeholder
             {error && (
                 <p className="text-center text-xs text-red-400 mt-2">{error}</p>
             )}
-            <p className="text-center text-xs text-gray-500 mt-3 font-medium">
+            <p className="text-center text-xs text-[var(--text-muted)] mt-3 font-medium">
                 {isRecording ? "🎙️ Listening... Click stop when done." : "AI can make mistakes. Please review generated queries."}
             </p>
         </div>
@@ -114,4 +114,3 @@ const ChatInput = ({ value, onChange, onSubmit, isLoading, disabled, placeholder
 };
 
 export default ChatInput;
-

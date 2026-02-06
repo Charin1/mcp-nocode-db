@@ -36,9 +36,9 @@ const Sidebar = () => {
   };
 
   const renderSchemaList = (items) => (
-    <ul className="space-y-1 ml-2 border-l border-gray-700 pl-2">
+    <ul className="space-y-1 ml-2 border-l border-[var(--border-subtle)] pl-2">
       {items.map(item => (
-        <li key={item.name} className="flex items-center px-2 py-1.5 text-sm text-gray-300 rounded-md cursor-pointer hover:bg-gray-700 transition-colors">
+        <li key={item.name} className="flex items-center px-2 py-1.5 text-sm text-[var(--text-secondary)] rounded-md cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors">
           {getIcon(item.type)}
           <span className="truncate">{item.name}</span>
         </li>
@@ -48,11 +48,11 @@ const Sidebar = () => {
 
   return (
     <>
-      <aside className="flex flex-col w-64 bg-gray-900 border-r border-gray-700 h-screen">
+      <aside className="flex flex-col w-64 bg-[var(--bg-secondary)] border-r border-[var(--border-color)] h-screen transition-colors">
         {/* Database Schema Section */}
-        <div className="flex-1 flex flex-col min-h-0 border-b border-gray-700">
-          <div className="px-4 py-3 border-b border-gray-700 bg-gray-800">
-            <h2 className="text-lg font-semibold text-white">
+        <div className="flex-1 flex flex-col min-h-0 border-b border-[var(--border-color)]">
+          <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
               {scope === 'all' ? 'All Databases' : 'Schema Explorer'}
             </h2>
           </div>
@@ -78,10 +78,10 @@ const Sidebar = () => {
                       .map(([dbId, dbData]) => (
                         <li key={dbId}>
                           <div
-                            className="flex items-center px-2 py-2 text-sm font-medium text-white rounded-md cursor-pointer hover:bg-gray-800"
+                            className="flex items-center px-2 py-2 text-sm font-medium text-[var(--text-primary)] rounded-md cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors"
                             onClick={() => toggleDbExpand(dbId)}
                           >
-                            <span className="mr-2 text-gray-400">
+                            <span className="mr-2 text-[var(--text-muted)]">
                               {expandedDbs[dbId] ? '▼' : '▶'}
                             </span>
                             <span className="truncate">{dbData.name}</span>
@@ -93,21 +93,21 @@ const Sidebar = () => {
                       ))}
                   </ul>
                 ) : (
-                  <div className="px-2 py-4 text-xs text-center text-gray-500">No databases found.</div>
+                  <div className="px-2 py-4 text-xs text-center text-[var(--text-muted)]">No databases found.</div>
                 )
               ) : (
                 // Current DB View
                 schema.length > 0 ? (
                   <ul className="space-y-1">
                     {schema.map(item => (
-                      <li key={item.name} className="flex items-center px-2 py-1.5 text-sm text-gray-300 rounded-md cursor-pointer hover:bg-gray-700 transition-colors">
+                      <li key={item.name} className="flex items-center px-2 py-1.5 text-sm text-[var(--text-secondary)] rounded-md cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors">
                         {getIcon(item.type)}
                         <span className="truncate">{item.name}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <li className="list-none px-2 py-4 text-xs text-center text-gray-500">No schema found or database not selected.</li>
+                  <li className="list-none px-2 py-4 text-xs text-center text-[var(--text-muted)]">No schema found or database not selected.</li>
                 )
               )
             )}
@@ -115,12 +115,12 @@ const Sidebar = () => {
         </div>
 
         {/* MCP Connections Section */}
-        <div className="flex flex-col h-1/3 bg-gray-900">
-          <div className="px-4 py-3 border-t border-b border-gray-700 bg-gray-800 flex justify-between items-center">
-            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">MCP Connections</h2>
+        <div className="flex flex-col h-1/3 bg-[var(--bg-secondary)]">
+          <div className="px-4 py-3 border-t border-b border-[var(--border-color)] bg-[var(--bg-tertiary)] flex justify-between items-center">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">MCP Connections</h2>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="p-1 text-gray-400 hover:text-white rounded-md hover:bg-gray-700"
+              className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-md hover:bg-[var(--bg-elevated)]"
               title="Add Connection"
             >
               <PlusIcon className="w-4 h-4" />
@@ -134,27 +134,27 @@ const Sidebar = () => {
             ) : (
               <ul className="space-y-1">
                 {connections.length > 0 ? connections.map(conn => (
-                  <li key={conn.id} className="group flex items-center justify-between px-2 py-2 text-sm text-gray-300 rounded-md hover:bg-gray-800 transition-colors">
+                  <li key={conn.id} className="group flex items-center justify-between px-2 py-2 text-sm text-[var(--text-secondary)] rounded-md hover:bg-[var(--bg-tertiary)] transition-colors">
                     <div className="flex items-center overflow-hidden cursor-pointer flex-1" onClick={() => toggleActiveConnection(conn.id)}>
                       <input
                         type="checkbox"
                         checked={activeConnectionIds.includes(conn.id)}
                         readOnly
-                        className="mr-2 rounded text-blue-600 focus:ring-blue-500 bg-gray-700 border-gray-600 pointer-events-none"
+                        className="mr-2 rounded text-brand-indigo focus:ring-brand-indigo bg-[var(--bg-tertiary)] border-[var(--border-color)] pointer-events-none"
                       />
-                      <LinkIcon className={`w-4 h-4 mr-2 flex-shrink-0 ${activeConnectionIds.includes(conn.id) ? 'text-green-400' : 'text-purple-400'}`} />
-                      <span className={`truncate ${activeConnectionIds.includes(conn.id) ? 'text-white' : ''}`} title={conn.url}>{conn.name}</span>
+                      <LinkIcon className={`w-4 h-4 mr-2 flex-shrink-0 ${activeConnectionIds.includes(conn.id) ? 'text-accent-emerald' : 'text-brand-purple'}`} />
+                      <span className={`truncate ${activeConnectionIds.includes(conn.id) ? 'text-[var(--text-primary)]' : ''}`} title={conn.url}>{conn.name}</span>
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteConnection(conn.id); }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-400 rounded transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-red-400 rounded transition-opacity"
                       title="Delete"
                     >
                       <TrashIcon className="w-4 h-4" />
                     </button>
                   </li>
                 )) : (
-                  <li className="px-2 py-4 text-xs text-center text-gray-500">No MCP connections added. Click + to add one.</li>
+                  <li className="px-2 py-4 text-xs text-center text-[var(--text-muted)]">No MCP connections added. Click + to add one.</li>
                 )}
               </ul>
             )}

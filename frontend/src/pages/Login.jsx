@@ -16,9 +16,6 @@ const Login = () => {
     setLoading(true);
     try {
       await login(email, password);
-      // navigation is handled by AuthContext state change or manually here if needed
-      // But since isAuthenticated changes, the <Navigate /> below might trigger or parent route might redirect
-      // For safety we can navigate, but usually we just let the state change handle it if wrapped in a PrivateRoute check
       navigate('/');
     } catch (error) {
       toast.error("Login failed. Please check your credentials.");
@@ -32,14 +29,20 @@ const Login = () => {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900">
-      <div className="w-full max-w-md p-8 space-y-8 bg-gray-800 rounded-lg shadow-lg">
-        <h2 className="text-3xl font-bold text-center text-white">
+    <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] transition-colors">
+      {/* Background gradient effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 pointer-events-none" />
+
+      <div className="relative w-full max-w-md p-8 space-y-8 glass-card rounded-2xl shadow-xl">
+        {/* Gradient border effect */}
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 -z-10 blur-xl" />
+
+        <h2 className="text-3xl font-bold text-center text-[var(--text-primary)] tracking-tight">
           MCP No-Code DB
         </h2>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="email" className="text-sm font-medium text-gray-400">Email address</label>
+            <label htmlFor="email" className="text-sm font-medium text-[var(--text-secondary)]">Email address</label>
             <input
               id="email"
               name="email"
@@ -48,11 +51,11 @@ const Login = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:ring-brand-blue focus:border-brand-blue"
+              className="w-full px-4 py-3 mt-1 text-[var(--text-primary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo transition-all"
             />
           </div>
           <div>
-            <label htmlFor="password" className="text-sm font-medium text-gray-400">Password</label>
+            <label htmlFor="password" className="text-sm font-medium text-[var(--text-secondary)]">Password</label>
             <input
               id="password"
               name="password"
@@ -61,22 +64,22 @@ const Login = () => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:ring-brand-blue focus:border-brand-blue"
+              className="w-full px-4 py-3 mt-1 text-[var(--text-primary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo transition-all"
             />
           </div>
           <div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 font-semibold text-white bg-brand-blue rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue disabled:bg-gray-500 flex justify-center items-center"
+              className="w-full px-4 py-3 font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-indigo disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center transition-all shadow-lg shadow-indigo-500/25"
             >
               {loading ? <Spinner size={20} /> : 'Sign in'}
             </button>
           </div>
         </form>
-        <div className="text-center text-gray-400">
+        <div className="text-center text-[var(--text-secondary)]">
           Don't have an account?{' '}
-          <Link to="/signup" className="text-brand-blue hover:text-blue-400">
+          <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
             Sign up
           </Link>
         </div>

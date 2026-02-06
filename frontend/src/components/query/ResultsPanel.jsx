@@ -12,7 +12,7 @@ const ResultsPanel = () => {
       return (
         <div className="flex items-center justify-center h-full">
           <Spinner />
-          <span className="ml-4 text-lg">Executing query...</span>
+          <span className="ml-4 text-lg text-[var(--text-primary)]">Executing query...</span>
         </div>
       );
     }
@@ -20,14 +20,14 @@ const ResultsPanel = () => {
     if (!queryResult) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-gray-500">Query results will appear here.</p>
+          <p className="text-[var(--text-muted)]">Query results will appear here.</p>
         </div>
       );
     }
 
     if (queryResult.error) {
       return (
-        <div className="p-4 text-red-400 bg-red-900/20 rounded-md overflow-auto">
+        <div className="p-4 text-red-400 bg-red-500/10 dark:bg-red-900/20 border border-red-500/20 rounded-md overflow-auto">
           <h3 className="font-bold">Execution Error</h3>
           <pre className="mt-2 text-sm whitespace-pre-wrap">{queryResult.error}</pre>
         </div>
@@ -43,7 +43,7 @@ const ResultsPanel = () => {
     }
 
     return (
-      <div className="p-4 text-green-400 bg-green-900/20 rounded-md">
+      <div className="p-4 text-green-500 dark:text-green-400 bg-green-500/10 dark:bg-green-900/20 border border-green-500/20 rounded-md">
         <h3 className="font-bold">Success</h3>
         <p>{queryResult.message || `Rows affected: ${queryResult.rows_affected}`}</p>
       </div>
@@ -51,7 +51,7 @@ const ResultsPanel = () => {
   };
 
   return (
-    <div className="h-full bg-gray-900 border border-gray-700 rounded-lg overflow-auto">
+    <div className="h-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg overflow-auto transition-colors">
       {renderContent()}
     </div>
   );

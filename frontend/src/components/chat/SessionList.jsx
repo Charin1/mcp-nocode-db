@@ -172,8 +172,8 @@ const SessionList = ({
         <div
             key={session.id}
             className={`group relative flex items-center justify-between rounded-lg transition-colors ${currentSessionId === session.id
-                ? 'bg-gray-800/80 text-white'
-                : 'text-gray-400 hover:bg-gray-800/40 hover:text-gray-200'
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
                 }`}
         >
             {editingSessionId === session.id ? (
@@ -184,7 +184,7 @@ const SessionList = ({
                         onChange={(e) => setEditTitle(e.target.value)}
                         onBlur={handleEditSave}
                         autoFocus
-                        className="w-full bg-[#0d1117] text-white text-sm px-2 py-1 rounded border border-indigo-500 focus:outline-none"
+                        className="w-full bg-[var(--bg-secondary)] text-[var(--text-primary)] text-sm px-2 py-1 rounded border border-brand-indigo focus:outline-none"
                         onClick={(e) => e.stopPropagation()}
                     />
                 </form>
@@ -203,7 +203,7 @@ const SessionList = ({
                 <div className={`px-2 ${dropdownOpenId === session.id ? 'block' : 'hidden group-hover:block'}`}>
                     <button
                         onClick={(e) => toggleDropdown(e, session.id)}
-                        className="p-1 rounded-md hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors"
+                        className="p-1 rounded-md hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                     >
                         <EllipsisHorizontalIcon className="w-5 h-5" />
                     </button>
@@ -212,18 +212,18 @@ const SessionList = ({
                     {dropdownOpenId === session.id && (
                         <div
                             ref={dropdownRef}
-                            className="absolute right-0 top-8 w-48 bg-[#1c2128] border border-gray-700 rounded-lg shadow-xl z-50 py-1 overflow-hidden"
+                            className="absolute right-0 top-8 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl z-50 py-1 overflow-hidden"
                         >
                             {movingSessionId === session.id ? (
                                 // Move Mode
                                 <>
-                                    <div className="px-3 py-2 text-xs font-semibold text-gray-400 border-b border-gray-700">
+                                    <div className="px-3 py-2 text-xs font-semibold text-[var(--text-muted)] border-b border-[var(--border-color)]">
                                         Move to...
                                     </div>
                                     <div className="max-h-48 overflow-y-auto">
                                         <button
                                             onClick={(e) => handleMoveToProject(e, null)}
-                                            className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-indigo-600 hover:text-white flex items-center space-x-2"
+                                            className="w-full text-left px-4 py-2 text-xs text-[var(--text-secondary)] hover:bg-brand-indigo hover:text-white flex items-center space-x-2"
                                         >
                                             <span>No Folder</span>
                                             {session.project_id === null && <span className="text-indigo-400 ml-auto text-[10px]">(Current)</span>}
@@ -232,7 +232,7 @@ const SessionList = ({
                                             <button
                                                 key={p.id}
                                                 onClick={(e) => handleMoveToProject(e, p.id)}
-                                                className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-indigo-600 hover:text-white flex items-center space-x-2 truncate"
+                                                className="w-full text-left px-4 py-2 text-xs text-[var(--text-secondary)] hover:bg-brand-indigo hover:text-white flex items-center space-x-2 truncate"
                                             >
                                                 <FolderIcon className="w-3 h-3 flex-shrink-0" />
                                                 <span className="truncate">{p.name}</span>
@@ -240,10 +240,10 @@ const SessionList = ({
                                             </button>
                                         ))}
                                     </div>
-                                    <div className="border-t border-gray-700 mt-1">
+                                    <div className="border-t border-[var(--border-color)] mt-1">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setMovingSessionId(null); }}
-                                            className="w-full text-left px-4 py-2 text-xs text-gray-400 hover:text-white"
+                                            className="w-full text-left px-4 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                                         >
                                             Cancel
                                         </button>
@@ -254,19 +254,19 @@ const SessionList = ({
                                 <>
                                     <button
                                         onClick={(e) => handleEditStart(session, e)}
-                                        className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-indigo-600 hover:text-white flex items-center space-x-2"
+                                        className="w-full text-left px-4 py-2 text-xs text-[var(--text-secondary)] hover:bg-brand-indigo hover:text-white flex items-center space-x-2"
                                     >
                                         <PencilIcon className="w-3 h-3" />
                                         <span>Rename</span>
                                     </button>
                                     <button
                                         onClick={handleMoveStart}
-                                        className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-indigo-600 hover:text-white flex items-center space-x-2"
+                                        className="w-full text-left px-4 py-2 text-xs text-[var(--text-secondary)] hover:bg-brand-indigo hover:text-white flex items-center space-x-2"
                                     >
                                         <ArrowRightOnRectangleIcon className="w-3 h-3" />
                                         <span>Move to Folder</span>
                                     </button>
-                                    <div className="border-t border-gray-700 my-1"></div>
+                                    <div className="border-t border-[var(--border-color)] my-1"></div>
                                     <button
                                         onClick={(e) => handleDelete(session.id, e)}
                                         className="w-full text-left px-4 py-2 text-xs text-red-400 hover:bg-red-900/30 hover:text-red-300 flex items-center space-x-2"
@@ -284,9 +284,9 @@ const SessionList = ({
     );
 
     return (
-        <div className="flex flex-col h-full bg-[#161b22] border-r border-gray-800 w-72 flex-shrink-0">
+        <div className="flex flex-col h-full bg-[var(--bg-secondary)] border-r border-[var(--border-color)] w-72 flex-shrink-0 transition-colors">
             {/* Header: New Chat & Search */}
-            <div className="p-4 border-b border-gray-800 space-y-3">
+            <div className="p-4 border-b border-[var(--border-color)] space-y-3">
                 <div className="flex space-x-2">
                     <button
                         onClick={() => onNewSession()}
@@ -298,7 +298,7 @@ const SessionList = ({
                     </button>
                     <button
                         onClick={handleCreateProjectClick}
-                        className="flex items-center justify-center px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                        className="flex items-center justify-center px-3 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded-lg transition-colors"
                         title="New Folder"
                     >
                         <FolderPlusIcon className="w-4 h-4" />
@@ -306,13 +306,13 @@ const SessionList = ({
                 </div>
 
                 <div className="relative">
-                    <MagnifyingGlassIcon className="w-4 h-4 text-gray-500 absolute left-3 top-2.5" />
+                    <MagnifyingGlassIcon className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-2.5" />
                     <input
                         type="text"
                         placeholder="Search..."
                         value={searchQuery}
                         onChange={handleSearch}
-                        className="w-full bg-[#0d1117] border border-gray-700 text-gray-300 text-sm rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors placeholder-gray-600"
+                        className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] text-sm rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:border-brand-indigo focus:ring-1 focus:ring-brand-indigo transition-colors placeholder-[var(--text-muted)]"
                     />
                 </div>
             </div>
@@ -326,7 +326,7 @@ const SessionList = ({
                         {groupedSessions.map(({ project, sessions }) => (
                             <div key={project.id} className="space-y-1">
                                 <div
-                                    className="group flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-400 hover:text-white cursor-pointer rounded hover:bg-gray-800/50"
+                                    className="group flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer rounded hover:bg-[var(--bg-tertiary)]"
                                     onClick={() => toggleProject(project.id)}
                                 >
                                     <div className="flex items-center space-x-2 overflow-hidden">
@@ -340,17 +340,17 @@ const SessionList = ({
                                     </div>
                                     <button
                                         onClick={(e) => handleProjectDelete(project.id, e)}
-                                        className="hidden group-hover:block p-1 hover:bg-red-900/50 text-gray-600 hover:text-red-400 rounded"
+                                        className="hidden group-hover:block p-1 hover:bg-red-900/50 text-[var(--text-muted)] hover:text-red-400 rounded"
                                     >
                                         <TrashIcon className="w-3 h-3" />
                                     </button>
                                 </div>
 
                                 {expandedProjects.has(project.id) && (
-                                    <div className="ml-2 pl-2 border-l border-gray-800 space-y-0.5">
+                                    <div className="ml-2 pl-2 border-l border-[var(--border-color)] space-y-0.5">
                                         {sessions.map(renderSessionItem)}
                                         {sessions.length === 0 && (
-                                            <div className="text-[10px] text-gray-600 px-3 py-1 italic">Empty folder</div>
+                                            <div className="text-[10px] text-[var(--text-muted)] px-3 py-1 italic">Empty folder</div>
                                         )}
                                     </div>
                                 )}
@@ -363,7 +363,7 @@ const SessionList = ({
                 <div className="space-y-1">
                     {/* Divider if we have projects */}
                     {groupedSessions.length > 0 && ungroupedSessions.length > 0 && (
-                        <div className="px-2 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        <div className="px-2 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
                             Unsorted Checks
                         </div>
                     )}
@@ -371,7 +371,7 @@ const SessionList = ({
                     {ungroupedSessions.map(renderSessionItem)}
 
                     {sessions.length === 0 && (
-                        <div className="text-center text-gray-500 text-sm mt-8 px-4">
+                        <div className="text-center text-[var(--text-muted)] text-sm mt-8 px-4">
                             {searchQuery ? "No chats found." : "No history yet."}
                         </div>
                     )}
@@ -380,7 +380,7 @@ const SessionList = ({
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t border-gray-800 text-[10px] text-gray-600 text-center font-mono">
+            <div className="p-3 border-t border-[var(--border-color)] text-[10px] text-[var(--text-muted)] text-center font-mono">
                 {sessions.length} Conversations • {projects.length} Folders
             </div>
         </div>

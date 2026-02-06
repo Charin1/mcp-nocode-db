@@ -17,8 +17,8 @@ const ChatResults = ({ results, onVisualize, showChart, chartConfig }) => {
 
     if (isJsonResult) {
         return (
-            <div className="mt-4 bg-gray-900 rounded-lg p-4 border border-gray-700 overflow-x-auto">
-                <pre className="text-xs text-green-400 font-mono">
+            <div className="mt-4 bg-[var(--bg-secondary)] rounded-lg p-4 border border-[var(--border-color)] overflow-x-auto">
+                <pre className="text-xs text-green-500 dark:text-green-400 font-mono">
                     {JSON.stringify(results.json_result, null, 2)}
                 </pre>
             </div>
@@ -26,7 +26,7 @@ const ChatResults = ({ results, onVisualize, showChart, chartConfig }) => {
     }
 
     if (!results || !results.rows || results.rows.length === 0) {
-        return <p className="text-sm text-gray-400 mt-2 italic">Query executed successfully, but returned no rows.</p>;
+        return <p className="text-sm text-[var(--text-muted)] mt-2 italic">Query executed successfully, but returned no rows.</p>;
     }
 
     const columnDefs = results.columns.map(col => ({ field: col, sortable: true, filter: true, resizable: true }));
@@ -34,7 +34,7 @@ const ChatResults = ({ results, onVisualize, showChart, chartConfig }) => {
 
     return (
         <div className="mt-4 animate-fade-in-up">
-            <div className="ag-theme-alpine-dark rounded-lg overflow-hidden border border-gray-700 shadow-lg" style={{ height: 350, width: '100%' }}>
+            <div className="ag-theme-alpine dark:ag-theme-alpine-dark rounded-lg overflow-hidden border border-[var(--border-color)] shadow-lg" style={{ height: 350, width: '100%' }}>
                 <AgGridReact
                     columnDefs={columnDefs}
                     rowData={rowData}
@@ -52,7 +52,7 @@ const ChatResults = ({ results, onVisualize, showChart, chartConfig }) => {
                 </button>
             </div>
             {showChart && (
-                <div className="mt-4 p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                <div className="mt-4 p-4 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-color)]">
                     <ChartVisualization results={results} chartConfig={chartConfig} />
                 </div>
             )}
@@ -62,16 +62,16 @@ const ChatResults = ({ results, onVisualize, showChart, chartConfig }) => {
 
 const QueryConfirmation = ({ query, onExecute, onCancel }) => {
     return (
-        <div className="mt-4 mb-2 p-0 rounded-xl bg-gray-900 border border-gray-700 overflow-hidden shadow-md">
-            <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Generated Query</span>
+        <div className="mt-4 mb-2 p-0 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] overflow-hidden shadow-md">
+            <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
+                <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Generated Query</span>
                 <div className="flex space-x-1">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
                 </div>
             </div>
-            <div className="bg-[#0d1117] p-1">
+            <div className="bg-[var(--bg-tertiary)] p-1">
                 <SimpleCodeEditor
                     value={query}
                     onValueChange={() => { }}
@@ -85,10 +85,10 @@ const QueryConfirmation = ({ query, onExecute, onCancel }) => {
                     readOnly
                 />
             </div>
-            <div className="px-4 py-3 bg-gray-800 border-t border-gray-700 flex justify-end space-x-3">
+            <div className="px-4 py-3 bg-[var(--bg-tertiary)] border-t border-[var(--border-color)] flex justify-end space-x-3">
                 <button
                     onClick={onCancel}
-                    className="px-4 py-1.5 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+                    className="px-4 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] rounded-md transition-colors"
                 >
                     Cancel
                 </button>
@@ -110,7 +110,7 @@ const MessageContent = ({ content, isAnimated }) => {
     const { displayedText, isComplete } = useTypewriter(content, 5, isAnimated);
 
     return (
-        <div className="text-[15px] leading-relaxed text-gray-300">
+        <div className="text-[15px] leading-relaxed text-[var(--text-primary)]">
             <p className="whitespace-pre-wrap">
                 {displayedText}
                 {!isComplete && isAnimated && (
@@ -128,7 +128,7 @@ const ChatMessage = ({ message, onExecuteQuery, onVisualize, visibleCharts, char
     const shouldAnimate = isAssistant && isLast;
 
     return (
-        <div className={`group flex space-x-4 md:space-x-6 py-6 ${!isLast ? 'border-b border-gray-800/50' : ''} animate-in fade-in duration-500`}>
+        <div className={`group flex space-x-4 md:space-x-6 py-6 ${!isLast ? 'border-b border-[var(--border-color)]' : ''} animate-in fade-in duration-500`}>
             {/* Avatar */}
             <div className="flex-shrink-0">
                 {isUser ? (
@@ -150,14 +150,14 @@ const ChatMessage = ({ message, onExecuteQuery, onVisualize, visibleCharts, char
                     <h3 className={`text-sm font-semibold tracking-wide ${isUser ? 'text-indigo-400' : 'text-emerald-400'}`}>
                         {isUser ? 'You' : 'AI Assistant'}
                     </h3>
-                    <span className="text-xs text-gray-600 px-1.5 py-0.5 rounded border border-gray-800 bg-gray-900/50 uppercase tracking-wider font-mono">
+                    <span className="text-xs text-[var(--text-muted)] px-1.5 py-0.5 rounded border border-[var(--border-color)] bg-[var(--bg-tertiary)] uppercase tracking-wider font-mono">
                         {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 </div>
 
                 {/* Body */}
                 {isUser ? (
-                    <div className="text-[15px] leading-relaxed text-gray-100 font-medium bg-gray-800/40 p-3 rounded-r-xl rounded-bl-xl border border-gray-700/50 inline-block">
+                    <div className="text-[15px] leading-relaxed text-[var(--text-primary)] font-medium bg-brand-indigo/10 dark:bg-gray-800/40 p-3 rounded-r-xl rounded-bl-xl border border-brand-indigo/20 dark:border-gray-700/50 inline-block">
                         <p className="whitespace-pre-wrap">{message.content}</p>
                     </div>
                 ) : (
@@ -189,16 +189,16 @@ const ChatMessage = ({ message, onExecuteQuery, onVisualize, visibleCharts, char
                 {/* Assistant Footer Actions */}
                 {isAssistant && (
                     <div className="flex items-center space-x-2 mt-2 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-1.5 text-gray-500 hover:text-gray-300 rounded hover:bg-gray-800" title="Copy">
+                        <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-tertiary)]" title="Copy">
                             <ClipboardDocumentIcon className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 text-gray-500 hover:text-gray-300 rounded hover:bg-gray-800" title="Good response">
+                        <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-tertiary)]" title="Good response">
                             <HandThumbUpIcon className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 text-gray-500 hover:text-gray-300 rounded hover:bg-gray-800" title="Bad response">
+                        <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-tertiary)]" title="Bad response">
                             <HandThumbDownIcon className="w-4 h-4" />
                         </button>
-                        <button className="flex items-center space-x-1 px-2 py-1 ml-2 text-xs text-gray-500 hover:text-gray-300 rounded hover:bg-gray-800">
+                        <button className="flex items-center space-x-1 px-2 py-1 ml-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-tertiary)]">
                             <ArrowPathIcon className="w-3 h-3" />
                             <span>Regenerate</span>
                         </button>
