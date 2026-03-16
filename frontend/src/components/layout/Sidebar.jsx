@@ -26,10 +26,25 @@ const Sidebar = () => {
   const { connections, fetchConnections, deleteConnection, isLoading, activeConnectionIds, toggleActiveConnection } = useMcpStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedDbs, setExpandedDbs] = useState({});
+  const [mcpSearch, setMcpSearch] = useState('');
 
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
+
+  const { fetchSchema, fetchGlobalSchema } = useDbStore();
+
+  useEffect(() => {
+    if (scope === 'all') {
+      if (Object.keys(globalSchema).length === 0 && !isLoadingSchema) {
+        fetchGlobalSchema();
+      }
+    } else {
+      if (selectedDbId && schema.length === 0 && !isLoadingSchema) {
+        fetchSchema(selectedDbId);
+      }
+    }
+  }, [scope, selectedDbId, fetchSchema, fetchGlobalSchema, globalSchema, schema, isLoadingSchema]);
 
   const toggleDbExpand = (dbId) => {
     setExpandedDbs(prev => ({ ...prev, [dbId]: !prev[dbId] }));
@@ -126,24 +141,44 @@ const Sidebar = () => {
               <PlusIcon className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex-1 p-2 overflow-y-auto">
+          
+          {/* Search Bar for MCP Connections */}
+          <div className="px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className="h-4 w-4 text-[var(--text-muted)]" />
+              </div>
+              <input
+                type="text"
+                value={mcpSearch}
+                onChange={(e) => setMcpSearch(e.target.value)}
+                placeholder="Search connections..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] rounded focus:outline-none focus:ring-1 focus:ring-brand-indigo focus:border-brand-indigo transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 p-2 overflow-y-auto max-h-[30vh]">
             {isLoading ? (
               <div className="flex items-center justify-center p-4">
                 <Spinner size="sm" />
               </div>
             ) : (
               <ul className="space-y-1">
-                {connections.length > 0 ? connections.map(conn => (
+                {connections
+                  .filter(conn => conn.name.toLowerCase().includes(mcpSearch.toLowerCase()) || (conn.url && conn.url.toLowerCase().includes(mcpSearch.toLowerCase())))
+                  .map(conn => (
                   <li key={conn.id} className="group flex items-center justify-between px-2 py-2 text-sm text-[var(--text-secondary)] rounded-md hover:bg-[var(--bg-tertiary)] transition-colors">
                     <div className="flex items-center overflow-hidden cursor-pointer flex-1" onClick={() => toggleActiveConnection(conn.id)}>
-                      <input
-                        type="checkbox"
-                        checked={activeConnectionIds.includes(conn.id)}
-                        readOnly
-                        className="mr-2 rounded text-brand-indigo focus:ring-brand-indigo bg-[var(--bg-tertiary)] border-[var(--border-color)] pointer-events-none"
-                      />
+                      {/* Custom Toggle Switch */}
+                      <div className="mr-3 relative inline-flex items-center cursor-pointer">
+                        <div className={`w-8 h-4 rounded-full transition-colors flex items-center ${activeConnectionIds.includes(conn.id) ? 'bg-brand-indigo' : 'bg-gray-500'}`}>
+                           <div className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform ${activeConnectionIds.includes(conn.id) ? 'translate-x-4' : 'translate-x-1'}`} />
+                        </div>
+                      </div>
+                      
                       <LinkIcon className={`w-4 h-4 mr-2 flex-shrink-0 ${activeConnectionIds.includes(conn.id) ? 'text-accent-emerald' : 'text-brand-purple'}`} />
-                      <span className={`truncate ${activeConnectionIds.includes(conn.id) ? 'text-[var(--text-primary)]' : ''}`} title={conn.url}>{conn.name}</span>
+                      <span className={`truncate ${activeConnectionIds.includes(conn.id) ? 'text-[var(--text-primary)] font-medium' : ''}`} title={conn.url}>{conn.name}</span>
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteConnection(conn.id); }}
@@ -153,7 +188,13 @@ const Sidebar = () => {
                       <TrashIcon className="w-4 h-4" />
                     </button>
                   </li>
-                )) : (
+                ))}
+                
+                {connections.length > 0 && connections.filter(conn => conn.name.toLowerCase().includes(mcpSearch.toLowerCase())).length === 0 && (
+                   <li className="px-2 py-4 text-xs text-center text-[var(--text-muted)]">No matching connections.</li>
+                )}
+
+                {connections.length === 0 && (
                   <li className="px-2 py-4 text-xs text-center text-[var(--text-muted)]">No MCP connections added. Click + to add one.</li>
                 )}
               </ul>

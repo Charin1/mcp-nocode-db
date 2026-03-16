@@ -5,6 +5,7 @@ import { useMcpStore } from 'stores/mcpStore';
 import ChatMessage from 'components/chat/ChatMessage';
 import ChatInput from 'components/chat/ChatInput';
 import SessionList from 'components/chat/SessionList';
+import ProjectModal from 'components/chat/ProjectModal';
 import { Bars3Icon, SparklesIcon } from '@heroicons/react/24/outline';
 import { autoDetectChartConfig, transformResultsToChartData } from '../utils/chartUtils';
 
@@ -23,6 +24,8 @@ const ChatbotPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [visibleCharts, setVisibleCharts] = useState({});
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Mobile/Toggle state if needed
+    const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+    const [editingProject, setEditingProject] = useState(null);
 
     // Refs & Store
     const chatEndRef = useRef(null);
@@ -73,12 +76,30 @@ const ChatbotPage = () => {
     }
 
     const handleCreateProject = async (name) => {
+        // Will be replaced by handleSaveProject, but keep for backward compatibility during refactor
+        setEditingProject(null);
+        setIsProjectModalOpen(true);
+    };
+
+    const handleEditProject = (project) => {
+        setEditingProject(project);
+        setIsProjectModalOpen(true);
+    };
+
+    const handleSaveProject = async (projectData) => {
         try {
-            const res = await apiClient.post('/api/chatbot/projects', { name });
-            setProjects([res.data, ...projects]);
+            if (projectData.id) {
+                // Update existing
+                const res = await apiClient.put(`/api/chatbot/projects/${projectData.id}`, projectData);
+                setProjects(projects.map(p => p.id === projectData.id ? res.data : p));
+            } else {
+                // Create new
+                const res = await apiClient.post('/api/chatbot/projects', projectData);
+                setProjects([res.data, ...projects]);
+            }
         } catch (error) {
-            console.error("Failed to create project:", error);
-            alert("Failed to create project.");
+            console.error("Failed to save project:", error);
+            alert("Failed to save project.");
         }
     };
 
@@ -112,7 +133,8 @@ const ChatbotPage = () => {
             const res = await apiClient.post('/api/chatbot/sessions', {
                 db_id: selectedDbId,
                 title: `New Chat`,
-                project_id: projectId
+                project_id: projectId,
+                scope: scope // Assuming backend might need this initially or we manage it per message
             });
 
             const newSession = res.data;
@@ -246,13 +268,14 @@ const ChatbotPage = () => {
             // Add active MCP IDs
             const activeMcpIds = useMcpStore.getState().activeConnectionIds;
             if (activeMcpIds.length > 0) {
-                // Pass as comma-separated string or multiple params? Backend handles both via custom logic I wrote
-                // but let's send as multiple keys 'active_mcp_ids' is standard for FastAPI List[str] if using axios paramsSerializer
-                // But here we are constructing URL manually-ish.
-                // My backend logic: ids_to_fetch.extend(id_val.split(",")) handles comma separated.
                 params.append('active_mcp_ids', activeMcpIds.join(','));
             }
 
+            // Always explicitly pass the current DB ID if scope is not "all", 
+            // otherwise rely on the session's db_id or pass a multi-db flag if needed.
+            // But the backend uses the session's db_id and the query param `scope`.
+            // So we just ensure `scope` is passed accurately.
+            
             const res = await apiClient.post(
                 `/api/chatbot/sessions/${activeSessionId}/message?${params.toString()}`,
                 {
@@ -376,7 +399,8 @@ const ChatbotPage = () => {
                     onSearch={handleSearch}
                     onRenameSession={handleRenameSession}
                     onDeleteSession={handleDeleteSession}
-                    onCreateProject={handleCreateProject}
+                    onCreateProject={() => { setEditingProject(null); setIsProjectModalOpen(true); }}
+                    onEditProject={handleEditProject}
                     onDeleteProject={handleDeleteProject}
                     onMoveSession={handleMoveSessionToProject}
                     isLoading={isLoading}
@@ -446,6 +470,14 @@ const ChatbotPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Project Settings Modal */}
+            <ProjectModal
+                isOpen={isProjectModalOpen}
+                onClose={() => setIsProjectModalOpen(false)}
+                project={editingProject}
+                onSave={handleSaveProject}
+            />
         </div>
     );
 };

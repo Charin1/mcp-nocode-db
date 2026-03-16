@@ -208,14 +208,47 @@ async def send_message(
             role="user",
             content=message.content
         )
+
+        # 3. Analyze Intent
+        analysis = await llm_service.analyze_intent(messages=[ChatMessage(role="user", content=message.content)])
+        intent = analysis.get("intent", "QUERY_REQUIRED")
         
-        # 3. Fetch Active MCP Tools
+        if intent == "ANSWER_DIRECTLY":
+            # Generate a simple response without tools/ReAct
+            response = await llm_service.generate_response_from_messages(
+                db_id=session.db_connection_id if session.db_connection_id else "default",
+                provider=model_provider,
+                messages=[ChatMessage(role="user", content=message.content)],
+                schema="",  # Not strictly needed for non-DB chat
+                engine="",
+                tools=None
+            )
+            await chat_service.add_message(
+                session_id=session_id,
+                role="assistant",
+                content=response.content
+            )
+            return await chat_service.get_session_messages(session_id=session_id)
+
+        if intent == "ASK_CLARIFICATION":
+            clarification_msg = analysis.get("clarification", "Could you please provide more details so I can help you better?")
+            await chat_service.add_message(
+                session_id=session_id,
+                role="assistant",
+                content=clarification_msg
+            )
+            return await chat_service.get_session_messages(session_id=session_id)
+
+        # 4. Fetch Active MCP Tools (Only if relevant for QUERY_REQUIRED)
         tools = []
         active_connections = []
-        if active_mcp_ids:
+        
+        # Heuristic for MCP relevance (as a sub-check within QUERY_REQUIRED)
+        mcp_keywords = ["python", "calculate", "mean", "chart", "graph", "plot", "math", "script"]
+        mcp_needed = any(kw in message.content.lower() for kw in mcp_keywords)
+
+        if active_mcp_ids and mcp_needed:
             # Parse IDs if they came as a single comma-separated string (frontend quirk handling)
-            # But normally List[str] handling depends on client. We'll assume List.
-            # Handle potential case where it's a single string of comma separated values
             ids_to_fetch = []
             for id_val in active_mcp_ids:
                 if "," in id_val:
@@ -241,10 +274,11 @@ async def send_message(
                         },
                         headers=conn.headers
                     )
-                    # Namespace tools to avoid collision? For now, raw.
                     tools.extend(conn_tools)
                 except Exception as e:
                     print(f"Failed to fetch tools from {conn.name}: {e}")
+
+
 
         # 4. ReAct Loop (Max depth 5)
         max_turns = 5
@@ -257,29 +291,59 @@ async def send_message(
             
             # Retrieve Context (Refresh each turn as we might add tool outputs)
             db_messages = await chat_service.get_session_messages(session_id=session_id)
+
+            # Add Project Knowledge & Custom System Prompt
+            project_system_prompt = None
+            if session.project_id:
+                # Need to fetch project to get properties
+                from db.models import Project
+                proj_res = await db.execute(select(Project).where(Project.id == session.project_id))
+                project_obj = proj_res.scalars().first()
+                if project_obj:
+                    # Construct project context
+                    proj_instructions = []
+                    if project_obj.system_prompt:
+                        proj_instructions.append(f"Project Specific Instructions:\n{project_obj.system_prompt}")
+                    if project_obj.knowledge_text:
+                        proj_instructions.append(f"Project Knowledge Base:\n{project_obj.knowledge_text}")
+                    
+                    if proj_instructions:
+                        project_system_prompt = "\n\n---\n\n".join(proj_instructions)
+
             context_messages = []
-            for db_msg in db_messages:
+            
+            # Keep only the last 20 messages for context to avoid token limits
+            recent_db_messages = db_messages[-20:] if len(db_messages) > 20 else db_messages
+            
+            # Inject project context as a system interaction at the very beginning of the context window
+            if project_system_prompt:
+                context_messages.append(ChatMessage(
+                    role="system",
+                    content=project_system_prompt
+                ))
+
+            for db_msg in recent_db_messages:
                 context_messages.append(ChatMessage(
                     role=db_msg.role,
                     content=db_msg.content,
                     query=db_msg.query
                 ))
             
-            if scope == "all":
+            if scope == "all" or session.db_id == "ALL":
                 # Multi-DB Mode: Scoped to the SAME ENGINE as the current session DB
                 try:
-                    current_engine = db_manager.get_db_engine(session.db_id)
-                    schema = await db_manager.get_all_schemas_for_prompt(engine_filter=current_engine)
-                    db_engine = "multi-db" # Triggers routing prompt
+                    if session.db_id and session.db_id != "ALL":
+                        current_engine = db_manager.get_db_engine(session.db_id)
+                        schema = await db_manager.get_all_schemas_for_prompt(engine_filter=current_engine)
+                        db_engine = "multi-db" # Triggers routing prompt
+                    else:
+                        schema = await db_manager.get_all_schemas_for_prompt() # Fallback to everything
+                        db_engine = "multi-db"
                 except Exception as e:
                      # Fallback if session DB is invalid or "ALL" legacy
                      print(f"Warning: Could not determine engine for scoping: {e}")
                      schema = await db_manager.get_all_schemas_for_prompt() # Fallback to everything
                      db_engine = "multi-db"
-            elif session.db_id == "ALL":
-                # Legacy handling for sessions created with ALL
-                schema = await db_manager.get_all_schemas_for_prompt()
-                db_engine = "multi-db"
             else:
                 schema = await db_manager.get_schema_for_prompt(session.db_id)
                 db_engine = db_manager.get_db_engine(session.db_id)

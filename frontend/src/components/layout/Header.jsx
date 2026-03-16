@@ -12,6 +12,14 @@ const Header = () => {
   return (
     <header className="flex items-center justify-between p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] transition-colors">
       <div className="flex items-center space-x-4">
+        {/* App Title */}
+        <div className="flex items-center mr-4">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-indigo to-brand-purple flex items-center justify-center mr-3 shadow-md">
+            <span className="text-white font-bold text-lg leading-none mt-[-2px]">m</span>
+          </div>
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-indigo to-brand-purple hidden sm:block">mcp-nocode-db</h1>
+        </div>
+        
         {/* Scope Selector */}
         <div>
           <label htmlFor="scope-selector" className="text-xs font-medium text-[var(--text-muted)]">SCOPE</label>

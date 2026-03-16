@@ -12,9 +12,47 @@ class ChatService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_project(self, user_id: str, name: str) -> Project:
-        project = Project(user_id=user_id, name=name)
+    async def create_project(self, user_id: str, name: str, system_prompt: str = None,知识_text: str = None) -> Project:
+        project = Project(user_id=user_id, name=name, system_prompt=system_prompt, knowledge_text=知识_text)
         self.db.add(project)
+        await self.db.commit()
+        await self.db.refresh(project)
+        return project
+
+    async def update_project(self, project_id: int, user_id: str, name: str = None, system_prompt: str = None, knowledge_text: str = None) -> Optional[Project]:
+        result = await self.db.execute(
+            select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        )
+        project = result.scalars().first()
+        if not project:
+            return None
+        
+        if name is not None:
+            project.name = name
+        if system_prompt is not None:
+            project.system_prompt = system_prompt
+        if knowledge_text is not None:
+            project.knowledge_text = knowledge_text
+            
+        await self.db.commit()
+        await self.db.refresh(project)
+        return project
+
+    async def update_project(self, project_id: int, user_id: str, name: str = None, system_prompt: str = None, knowledge_text: str = None) -> Optional[Project]:
+        result = await self.db.execute(
+            select(Project).where(Project.id == project_id, Project.user_id == user_id)
+        )
+        project = result.scalars().first()
+        if not project:
+            return None
+        
+        if name is not None:
+            project.name = name
+        if system_prompt is not None:
+            project.system_prompt = system_prompt
+        if knowledge_text is not None:
+            project.knowledge_text = knowledge_text
+            
         await self.db.commit()
         await self.db.refresh(project)
         return project

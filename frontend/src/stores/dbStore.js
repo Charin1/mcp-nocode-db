@@ -35,17 +35,26 @@ export const useDbStore = create((set, get) => ({
   },
 
   setSelectedDbId: (dbId) => {
-    set({ selectedDbId: dbId, schema: [], queryResult: null, generatedQuery: null });
-    if (dbId !== 'ALL') {
-      get().fetchSchema();
+    // If dbId is null or empty, just reset
+    if (!dbId) {
+      set({ selectedDbId: null, schema: [], queryResult: null, generatedQuery: null });
+      return;
     }
+    
+    set({ selectedDbId: dbId, schema: [], queryResult: null, generatedQuery: null });
+    // Fetch schema for the selected DB if we are in 'current' scope or if we just want it refreshed
+    get().fetchSchema(dbId);
   },
 
   setScope: (scope) => {
     set({ scope });
     if (scope === 'all') {
-      // Don't overwrite selectedDbId, just fetch global schema
       get().fetchGlobalSchema();
+    } else {
+      // Re-fetch current DB schema if switching back to current
+      if (get().selectedDbId && get().selectedDbId !== 'ALL') {
+         get().fetchSchema(get().selectedDbId);
+      }
     }
   },
 

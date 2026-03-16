@@ -23,6 +23,7 @@ const SessionList = ({
     onRenameSession,
     onSearch,
     onCreateProject,
+    onEditProject,
     onDeleteProject,
     onMoveSession,
     isLoading
@@ -91,9 +92,13 @@ const SessionList = ({
     };
 
     const handleCreateProjectClick = () => {
-        const name = window.prompt("Enter folder name:");
-        if (name && name.trim()) {
-            onCreateProject(name.trim());
+        onCreateProject(); // Will trigger modal in parent
+    };
+
+    const handleProjectEdit = (project, e) => {
+        e.stopPropagation();
+        if (onEditProject) {
+            onEditProject(project);
         }
     };
 
@@ -338,12 +343,22 @@ const SessionList = ({
                                         <span className="truncate uppercase tracking-wider">{project.name}</span>
                                         <span className="text-gray-600 text-[10px] ml-1">({sessions.length})</span>
                                     </div>
-                                    <button
-                                        onClick={(e) => handleProjectDelete(project.id, e)}
-                                        className="hidden group-hover:block p-1 hover:bg-red-900/50 text-[var(--text-muted)] hover:text-red-400 rounded"
-                                    >
-                                        <TrashIcon className="w-3 h-3" />
-                                    </button>
+                                    <div className="hidden group-hover:flex items-center space-x-1">
+                                        <button
+                                            onClick={(e) => handleProjectEdit(project, e)}
+                                            className="p-1 hover:bg-brand-indigo/10 text-[var(--text-muted)] hover:text-brand-indigo rounded"
+                                            title="Edit Project"
+                                        >
+                                            <PencilIcon className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleProjectDelete(project.id, e)}
+                                            className="p-1 hover:bg-red-900/50 text-[var(--text-muted)] hover:text-red-400 rounded"
+                                            title="Delete Project"
+                                        >
+                                            <TrashIcon className="w-3 h-3" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {expandedProjects.has(project.id) && (

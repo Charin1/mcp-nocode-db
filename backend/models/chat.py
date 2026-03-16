@@ -44,12 +44,16 @@ class Project(BaseModel):
     id: int
     user_id: str
     name: str
+    system_prompt: Optional[str] = None
+    knowledge_text: Optional[str] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
 class CreateProjectRequest(BaseModel):
     name: str
+    system_prompt: Optional[str] = None
+    knowledge_text: Optional[str] = None
 
 class InitialChatResponse(BaseModel):
     session: ChatSession

@@ -11,6 +11,8 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=False)
     name = Column(String, nullable=False)
+    system_prompt = Column(Text, nullable=True)
+    knowledge_text = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     sessions = relationship("ChatSession", back_populates="project")

@@ -47,6 +47,52 @@ class LLMService:
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
+    async def analyze_intent(self, messages: List[ChatMessage]) -> Dict[str, Any]:
+        """
+        Analyzes the user's latest request to determine if it can be answered directly,
+        needs clarification, or requires a database/tool query.
+        """
+        last_user_message = next((m.content for m in reversed(messages) if m.role == 'user'), None)
+        if not last_user_message:
+            return {"intent": "ANSWER_DIRECTLY", "response": "How can I help you today?"}
+
+        # 1. Fast Keyword Check for obvious greetings/general chat
+        greetings = ["hi", "hello", "hey", "who are you", "what can you do", "thanks", "thank you"]
+        if last_user_message.lower().strip() in greetings:
+            return {"intent": "ANSWER_DIRECTLY"}
+
+        # 2. LLM-based Detailed Analysis
+        analysis_prompt = f"""
+        Analyze the following user request in the context of a No-Code Database Assistant.
+        
+        Request: "{last_user_message}"
+        
+        Categorize the request into one of these intents:
+        - QUERY_REQUIRED: The user wants to see, analyze, or modify data in a database.
+        - ASK_CLARIFICATION: The user's request is related to data but is too vague (e.g., "Find records" without saying which ones) or lacks critical parameters.
+        - ANSWER_DIRECTLY: The user is asking a general question, greeting you, or saying something that doesn't involve the database.
+
+        If the intent is ASK_CLARIFICATION, provide a brief, helpful question to ask the user.
+        
+        Respond ONLY with a JSON object in this format:
+        {{
+          "intent": "QUERY_REQUIRED" | "ASK_CLARIFICATION" | "ANSWER_DIRECTLY",
+          "clarification": "Your question here (only if ASK_CLARIFICATION)"
+        }}
+        """
+        
+        try:
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = await model.generate_content_async(analysis_prompt)
+            # Remove markdown formatting if present
+            clean_text = response.text.replace("```json", "").replace("```", "").strip()
+            result = json.loads(clean_text)
+            print(f"DEBUG: Intent Analysis Result: {result}")
+            return result
+        except Exception as e:
+            print(f"Warning: Intent analysis failed: {e}. Defaulting to QUERY_REQUIRED.")
+            return {"intent": "QUERY_REQUIRED"}
+
     async def generate_response_from_messages(
         self, db_id: str, provider: str, messages: List[ChatMessage], schema: str, engine: str, tools: List[Dict[str, Any]] = None
     ) -> ChatMessage:
@@ -58,6 +104,8 @@ class LLMService:
             if cache_key in self.cache:
                 print(f"Returning cached response for: {cache_key}")
                 return self.cache[cache_key]
+
+
 
         if provider.lower() == "gemini":
             prompt = self._build_chat_prompt(messages, schema, engine, tools)
@@ -252,6 +300,11 @@ class LLMService:
                 - **ONLY generate SELECT statements.** Never generate INSERT, UPDATE, DELETE, DROP, or DDL.
                 - If the user asks a general question *unrelated* to data retrieval, you may answer briefly.
 
+            3.  **Self-Correction**:
+                - Before returning your response, double-check your generated syntax against the provided schema.
+                - Make sure all column names exist exactly as written in the schema.
+                - Output ONLY the final validated query.
+
             3.  **SQL Query Guidelines**:
                 - Use proper JOIN syntax when combining tables.
                 - Use appropriate WHERE clauses for filtering.
@@ -285,6 +338,10 @@ class LLMService:
             2.  **Orchestration**:
                 - If the user asks for data, generate the MongoDB JSON.
                 - Check **Available Tools** first.
+
+            3.  **Self-Correction**:
+                - Double-check the generated JSON to ensure it is completely valid and correctly targets the schema.
+                - Keys should be strings, and the structure must match MongoDB Node.js driver syntax.
 
             3.  **MongoDB Query Format**:
                 - Return a JSON object with:
@@ -384,6 +441,9 @@ class LLMService:
                 - **ONLY generate SELECT statements.** Never generate INSERT, UPDATE, DELETE, DROP, or DDL.
                 - If the user asks a general question *unrelated* to data retrieval, you may answer briefly.
 
+            3.  **Self-Correction**:
+                - Double-check the generated SQL syntax to ensure it is completely valid and uses EXACT column names from the internal schema.
+
             3.  **SQL Query Guidelines**:
                 - Use proper JOIN syntax when combining tables.
                 - Use appropriate WHERE clauses for filtering.
@@ -418,6 +478,9 @@ class LLMService:
                 - If the user asks a general question *unrelated* to data retrieval, you may answer briefly.
                 - But if the intent is to QUERY DATA, you must return JSON ONLY.
                 - Check **Available Tools** first.
+
+            3.  **Self-Correction**:
+                - Double-check the generated JSON to ensure it is completely valid without comments and targets the correct document fields.
 
             3.  **MongoDB Query Format**:
                 - Return a JSON object with:
