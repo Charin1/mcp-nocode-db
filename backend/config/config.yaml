@@ -73,7 +73,7 @@ databases:
 
 # LLM provider configuration
 llm:
-  default_provider: "gemini" # Can be 'gemini', 'chatgpt', or 'groq'
+  default_provider: "gemini" # Can be 'gemini', 'chatgpt', 'groq', or 'ollama'
   providers:
     gemini:
       model: "gemini-2.5-flash" # A fast and capable model
@@ -81,6 +81,10 @@ llm:
       model: "gpt-4-turbo"
     groq:
       model: "llama-3.3-70b-versatile"
+    ollama:
+      model: "llama3" # Default model for Ollama. Can be changed in requests.
+      # Assumes Ollama is running locally. For Docker, this might be http://host.docker.internal:11434
+      host: "http://localhost:11434"
 
 # Metadata database for audit logs and saved queries
 metadata_db:

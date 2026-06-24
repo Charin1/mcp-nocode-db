@@ -183,6 +183,7 @@ async def send_message(
     session_id: int, 
     message: ChatMessage, 
     model_provider: str = "gemini",
+    model: Optional[str] = Query(None),
     scope: Optional[str] = Query(None),
     active_mcp_ids: Optional[List[str]] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -218,6 +219,7 @@ async def send_message(
             response = await llm_service.generate_response_from_messages(
                 db_id=session.db_connection_id if session.db_connection_id else "default",
                 provider=model_provider,
+                model=model,
                 messages=[ChatMessage(role="user", content=message.content)],
                 schema="",  # Not strictly needed for non-DB chat
                 engine="",
@@ -241,6 +243,7 @@ async def send_message(
 
         # 4. Fetch Active MCP Tools (Only if relevant for QUERY_REQUIRED)
         tools = []
+        tool_to_connection_map = {}
         active_connections = []
         
         # Heuristic for MCP relevance (as a sub-check within QUERY_REQUIRED)
@@ -274,7 +277,13 @@ async def send_message(
                         },
                         headers=conn.headers
                     )
-                    tools.extend(conn_tools)
+                    for tool in conn_tools:
+                        # Namespace tool with connection name for reliable routing
+                        namespaced_tool_name = f"{conn.name}::{tool['name']}"
+                        tool['name'] = namespaced_tool_name
+                        tools.append(tool)
+                        tool_to_connection_map[namespaced_tool_name] = conn
+
                 except Exception as e:
                     print(f"Failed to fetch tools from {conn.name}: {e}")
 
@@ -353,6 +362,7 @@ async def send_message(
             response_message = await llm_service.generate_response_from_messages(
                 db_id=session.db_id,
                 provider=model_provider,
+                model=model,
                 messages=context_messages,
                 schema=schema,
                 engine=db_engine,
@@ -365,42 +375,46 @@ async def send_message(
                 import json
                 try:
                     payload = json.loads(response_message.query[len("__TOOL_CALL__:") :])
-                    tool_name = payload["tool"]
+                    namespaced_tool_name = payload["tool"]
                     tool_args = payload["args"]
                     
-                    print(f"Model executing MCP Tool: {tool_name} with args: {tool_args}")
+                    print(f"Model executing MCP Tool: {namespaced_tool_name} with args: {tool_args}")
 
                     # Save the "Thought/Action" from assistant
                     await chat_service.add_message(
                         session_id=session_id,
                         role="assistant",
                         content=response_message.content,
-                        query=f"Executing tool: {tool_name}"
+                        query=f"Executing tool: {namespaced_tool_name}"
                     )
                     
-                    # Find which connection has this tool
-                    tool_result = f"Error: Tool {tool_name} not found or failed execution."
+                    # Efficiently find the connection using the namespaced tool name
+                    target_conn = tool_to_connection_map.get(namespaced_tool_name)
+                    tool_result = f"Error: Tool {namespaced_tool_name} not found or failed execution."
                     
-                    for conn in active_connections:
-                         try:
-                             # TODO: Improve efficient tool routing.
-                             print(f"Sending tool call to connection: {conn.name} ({conn.url})")
-                             res = await mcp_client.call_tool(
-                                 connection_config={
-                                     "type": conn.connection_type,
-                                     "url": conn.url,
-                                     "configuration": conn.configuration or {}
-                                 }, 
-                                 tool_name=tool_name, 
-                                 arguments=tool_args, 
-                                 headers=conn.headers
-                             )
-                             tool_result = f"Tool Output: {res}"
-                             print(f"Tool executed successfully. Output len: {len(str(res))}")
-                             break # Success
-                         except Exception as exc:
-                             print(f"Tool execution failed on {conn.name}: {exc}")
-                             continue
+                    if target_conn:
+                        try:
+                            # Extract original tool name for the call
+                            original_tool_name = namespaced_tool_name.split("::", 1)[1]
+                            
+                            print(f"Sending tool call to connection: {target_conn.name} ({target_conn.url})")
+                            res = await mcp_client.call_tool(
+                                connection_config={
+                                    "type": target_conn.connection_type,
+                                    "url": target_conn.url,
+                                    "configuration": target_conn.configuration or {}
+                                }, 
+                                tool_name=original_tool_name, 
+                                arguments=tool_args, 
+                                headers=target_conn.headers
+                            )
+                            tool_result = f"Tool Output: {res}"
+                            print(f"Tool executed successfully. Output len: {len(str(res))}")
+                        except Exception as exc:
+                            tool_result = f"Tool execution failed on {target_conn.name}: {exc}"
+                            print(tool_result)
+                    else:
+                        print(tool_result)
                     
                     # Save Tool Result
                     await chat_service.add_message(
@@ -533,19 +547,11 @@ async def generate_visualization(
                 columns=request.columns,
                 rows=request.rows
             )
-
+            
         if not chart_config:
-            raise HTTPException(
-                status_code=400, 
-                detail="Unable to generate visualization for this data. Ensure the data contains numeric columns."
-            )
+            return VisualizationResponse(chart_config={}, message="Could not determine a suitable chart for this data.")
 
-        return VisualizationResponse(
-            chart_config=chart_config,
-            message="Chart configuration generated successfully."
-        )
-
-    except HTTPException:
-        raise
+        return VisualizationResponse(chart_config=chart_config, message="Chart configuration generated successfully.")
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -3,9 +3,10 @@ import google.generativeai as genai
 from openai import OpenAI
 from groq import AsyncGroq
 import yaml
+import httpx
 import json
-from typing import List, Dict, Any
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from typing import List, Dict, Any, Optional
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from models.query import GeneratedQuery, ChatMessage
 
@@ -33,17 +34,25 @@ class LLMService:
         if self.groq_api_key:
              self.groq_client = AsyncGroq(api_key=self.groq_api_key)
 
+        # Configure Ollama
+        self.ollama_config = self.config["providers"].get("ollama", {})
+        self.ollama_client = None
+        if self.ollama_config.get("host"):
+            self.ollama_client = httpx.AsyncClient(base_url=self.ollama_config["host"])
+
     async def generate_query(
-        self, provider: str, natural_language_query: str, schema: str, engine: str
+        self, provider: str, natural_language_query: str, schema: str, engine: str, model: Optional[str] = None
     ) -> GeneratedQuery:
         prompt = self._build_prompt(natural_language_query, schema, engine)
 
         if provider.lower() == "gemini":
-            return await self._generate_with_gemini(prompt, engine)
+            return await self._generate_with_gemini(prompt, engine, model)
         elif provider.lower() == "chatgpt":
-            return await self._generate_with_chatgpt(prompt, engine)
+            return await self._generate_with_chatgpt(prompt, engine, model)
         elif provider.lower() == "groq":
-            return await self._generate_with_groq(prompt, engine)
+            return await self._generate_with_groq(prompt, engine, model)
+        elif provider.lower() == "ollama":
+            return await self._generate_with_ollama(prompt, engine, model)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
@@ -94,7 +103,7 @@ class LLMService:
             return {"intent": "QUERY_REQUIRED"}
 
     async def generate_response_from_messages(
-        self, db_id: str, provider: str, messages: List[ChatMessage], schema: str, engine: str, tools: List[Dict[str, Any]] = None
+        self, db_id: str, provider: str, messages: List[ChatMessage], schema: str, engine: str, tools: List[Dict[str, Any]] = None, model: Optional[str] = None
     ) -> ChatMessage:
         last_user_message = next((m.content for m in reversed(messages) if m.role == 'user'), None)
 
@@ -109,13 +118,17 @@ class LLMService:
 
         if provider.lower() == "gemini":
             prompt = self._build_chat_prompt(messages, schema, engine, tools)
-            raw_response = await self._generate_chat_with_gemini(prompt)
+            raw_response = await self._generate_chat_with_gemini(prompt, model)
         elif provider.lower() == "chatgpt":
             system_prompt = self._build_chat_system_prompt(schema, engine, tools)
-            raw_response = await self._generate_chat_with_chatgpt(system_prompt, messages)
+            raw_response = await self._generate_chat_with_chatgpt(system_prompt, messages, model)
         elif provider.lower() == "groq":
             system_prompt = self._build_chat_system_prompt(schema, engine, tools)
-            raw_response = await self._generate_chat_with_groq(system_prompt, messages)
+            raw_response = await self._generate_chat_with_groq(system_prompt, messages, model)
+        elif provider.lower() == "ollama":
+            # Ollama works best with a system prompt + message history, similar to OpenAI/Groq.
+            system_prompt = self._build_chat_system_prompt(schema, engine, tools)
+            raw_response = await self._generate_chat_with_ollama(system_prompt, messages, model)
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
@@ -532,9 +545,9 @@ class LLMService:
             """
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _generate_with_gemini(self, prompt: str, engine: str) -> GeneratedQuery:
+    async def _generate_with_gemini(self, prompt: str, engine: str, model: Optional[str] = None) -> GeneratedQuery:
         try:
-            model_name = self.config["providers"]["gemini"]["model"]
+            model_name = model or self.config["providers"]["gemini"]["model"]
             model = genai.GenerativeModel(model_name)
             response = await model.generate_content_async(prompt)
             raw_text = ""
@@ -559,7 +572,7 @@ class LLMService:
             raise e
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _generate_with_chatgpt(self, prompt: str, engine: str) -> GeneratedQuery:
+    async def _generate_with_chatgpt(self, prompt: str, engine: str, model: Optional[str] = None) -> GeneratedQuery:
         if not self.openai_client:
             return GeneratedQuery(
                 raw_query="", 
@@ -567,7 +580,7 @@ class LLMService:
                 query_type=engine
             )
         try:
-            model_name = self.config["providers"]["chatgpt"]["model"]
+            model_name = model or self.config["providers"]["chatgpt"]["model"]
             response = self.openai_client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -584,7 +597,7 @@ class LLMService:
             raise e
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _generate_with_groq(self, prompt: str, engine: str) -> GeneratedQuery:
+    async def _generate_with_groq(self, prompt: str, engine: str, model: Optional[str] = None) -> GeneratedQuery:
         if not self.groq_client:
             return GeneratedQuery(
                 raw_query="", 
@@ -592,7 +605,7 @@ class LLMService:
                 query_type=engine
             )
         try:
-            model_name = self.config["providers"]["groq"]["model"]
+            model_name = model or self.config["providers"]["groq"]["model"]
             response = await self.groq_client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -605,6 +618,37 @@ class LLMService:
             )
             raw_text = response.choices[0].message.content.strip()
             return self._parse_llm_response(raw_text, engine)
+        except Exception as e:
+            raise e
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    async def _generate_with_ollama(self, prompt: str, engine: str, model: Optional[str] = None) -> GeneratedQuery:
+        if not self.ollama_client:
+            return GeneratedQuery(
+                raw_query="",
+                error="Ollama host not configured in config.yaml.",
+                query_type=engine,
+            )
+        try:
+            model_name = model or self.ollama_config.get("model", "llama3")
+            response = await self.ollama_client.post(
+                "/api/chat",
+                json={
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.0 # Deterministic for query generation
+                    }
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+            data = response.json()
+            raw_text = data.get("message", {}).get("content", "").strip()
+            return self._parse_llm_response(raw_text, engine)
+        except httpx.RequestError as e:
+            raise Exception(f"Could not connect to Ollama server at {self.ollama_config['host']}. Is it running?") from e
         except Exception as e:
             raise e
 
@@ -718,11 +762,11 @@ class LLMService:
             return GeneratedQuery(raw_query=text, query_type=engine)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _generate_chat_with_gemini(self, prompt: str) -> str:
+    async def _generate_chat_with_gemini(self, prompt: str, model: Optional[str] = None) -> str:
         try:
-            model_name = self.config["providers"]["gemini"]["model"]
-            model = genai.GenerativeModel(model_name)
-            response = await model.generate_content_async(prompt)
+            model_name = model or self.config["providers"]["gemini"]["model"]
+            genai_model = genai.GenerativeModel(model_name)
+            response = await genai_model.generate_content_async(prompt)
             if response.candidates and response.candidates[0].content.parts:
                 return response.candidates[0].content.parts[0].text
             else:
@@ -732,12 +776,12 @@ class LLMService:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_chat_with_chatgpt(
-        self, system_prompt: str, messages: List[ChatMessage]
+        self, system_prompt: str, messages: List[ChatMessage], model: Optional[str] = None
     ) -> str:
         if not self.openai_client:
              return "Error: OpenAI API key not configured."
         try:
-            model_name = self.config["providers"]["chatgpt"]["model"]
+            model_name = model or self.config["providers"]["chatgpt"]["model"]
             formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
             response = self.openai_client.chat.completions.create(
                 model=model_name,
@@ -752,12 +796,12 @@ class LLMService:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _generate_chat_with_groq(
-        self, system_prompt: str, messages: List[ChatMessage]
+        self, system_prompt: str, messages: List[ChatMessage], model: Optional[str] = None
     ) -> str:
         if not self.groq_client:
              return "Error: Groq API key not configured."
         try:
-            model_name = self.config["providers"]["groq"]["model"]
+            model_name = model or self.config["providers"]["groq"]["model"]
             formatted_messages = [{"role": m.role, "content": m.content} for m in messages]
             response = await self.groq_client.chat.completions.create(
                 model=model_name,
@@ -767,6 +811,35 @@ class LLMService:
                 ],
             )
             return response.choices[0].message.content.strip()
+        except Exception as e:
+            raise e
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    async def _generate_chat_with_ollama(
+        self, system_prompt: str, messages: List[ChatMessage], model: Optional[str] = None
+    ) -> str:
+        if not self.ollama_client:
+             return "Error: Ollama host not configured in config.yaml."
+        try:
+            model_name = model or self.ollama_config.get("model", "llama3")
+            # Format messages for Ollama: system prompt first, then history.
+            formatted_messages = [{"role": "system", "content": system_prompt}]
+            formatted_messages.extend([{"role": m.role, "content": m.content} for m in messages])
+
+            response = await self.ollama_client.post(
+                "/api/chat",
+                json={
+                    "model": model_name,
+                    "messages": formatted_messages,
+                    "stream": False,
+                },
+                timeout=120, # Longer timeout for chat
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("message", {}).get("content", "").strip()
+        except httpx.RequestError as e:
+            raise Exception(f"Could not connect to Ollama server at {self.ollama_config['host']}. Is it running?") from e
         except Exception as e:
             raise e
 

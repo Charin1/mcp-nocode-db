@@ -38,25 +38,6 @@ class ChatService:
         await self.db.refresh(project)
         return project
 
-    async def update_project(self, project_id: int, user_id: str, name: str = None, system_prompt: str = None, knowledge_text: str = None) -> Optional[Project]:
-        result = await self.db.execute(
-            select(Project).where(Project.id == project_id, Project.user_id == user_id)
-        )
-        project = result.scalars().first()
-        if not project:
-            return None
-        
-        if name is not None:
-            project.name = name
-        if system_prompt is not None:
-            project.system_prompt = system_prompt
-        if knowledge_text is not None:
-            project.knowledge_text = knowledge_text
-            
-        await self.db.commit()
-        await self.db.refresh(project)
-        return project
-
     async def get_user_projects(self, user_id: str) -> List[Project]:
         result = await self.db.execute(
             select(Project).where(Project.user_id == user_id).order_by(Project.created_at.desc())
