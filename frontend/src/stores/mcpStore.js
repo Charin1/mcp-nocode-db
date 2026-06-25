@@ -47,6 +47,21 @@ export const useMcpStore = create((set, get) => ({
         }
     },
 
+    updateConnection: async (id, connectionData) => {
+        try {
+            const response = await apiClient.put(`/api/mcp-connections/${id}`, connectionData);
+            set((state) => ({
+                connections: state.connections.map((c) => c.id === id ? response.data : c)
+            }));
+            toast.success("MCP Connection updated successfully.");
+            return true;
+        } catch (error) {
+            console.error("Failed to update MCP connection", error);
+            toast.error("Failed to update MCP connection.");
+            return false;
+        }
+    },
+
     toggleActiveConnection: (id) => {
         set((state) => {
             const isActive = state.activeConnectionIds.includes(id);

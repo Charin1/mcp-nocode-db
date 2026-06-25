@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useMcpStore } from 'stores/mcpStore';
 
-const MCPConnectionModal = ({ isOpen, onClose }) => {
-    const { addConnection } = useMcpStore();
+const MCPConnectionModal = ({ isOpen, onClose, editingConnection }) => {
+    const { addConnection, updateConnection } = useMcpStore();
     const [name, setName] = useState('');
 
     // SSE State
@@ -18,6 +18,41 @@ const MCPConnectionModal = ({ isOpen, onClose }) => {
     const [headers, setHeaders] = useState('');
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (editingConnection) {
+            setName(editingConnection.name || '');
+            setConnectionType(editingConnection.connection_type || 'sse');
+            
+            const config = editingConnection.configuration || {};
+            if (editingConnection.connection_type === 'sse') {
+                setUrl(config.url || editingConnection.url || '');
+                setHeaders(editingConnection.headers ? JSON.stringify(editingConnection.headers, null, 2) : '');
+                setCommand('');
+                setArgs('');
+                setEnv('');
+            } else {
+                setCommand(config.command || '');
+                const rawArgs = config.args || [];
+                if (Array.isArray(rawArgs)) {
+                    setArgs(JSON.stringify(rawArgs));
+                } else {
+                    setArgs(rawArgs);
+                }
+                setEnv(config.env ? JSON.stringify(config.env, null, 2) : '');
+                setUrl('');
+                setHeaders('');
+            }
+        } else {
+            setName('');
+            setUrl('');
+            setConnectionType('sse');
+            setCommand('');
+            setArgs('');
+            setEnv('');
+            setHeaders('');
+        }
+    }, [editingConnection, isOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -75,7 +110,10 @@ const MCPConnectionModal = ({ isOpen, onClose }) => {
             };
         }
 
-        const success = await addConnection(payload);
+        const success = editingConnection
+            ? await updateConnection(editingConnection.id, payload)
+            : await addConnection(payload);
+            
         setIsSubmitting(false);
         if (success) {
             setName('');
@@ -96,7 +134,7 @@ const MCPConnectionModal = ({ isOpen, onClose }) => {
                 <Dialog.Panel className="w-full max-w-md p-6 bg-[var(--bg-secondary)] rounded-lg shadow-xl border border-[var(--border-color)]">
                     <div className="flex items-center justify-between mb-4">
                         <Dialog.Title className="text-lg font-medium text-[var(--text-primary)]">
-                            Add MCP Connection
+                            {editingConnection ? 'Edit MCP Connection' : 'Add MCP Connection'}
                         </Dialog.Title>
                         <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                             <XMarkIcon className="w-6 h-6" />
@@ -220,7 +258,9 @@ const MCPConnectionModal = ({ isOpen, onClose }) => {
                                 disabled={isSubmitting}
                                 className="px-4 py-2 text-sm font-medium text-white bg-brand-indigo rounded-md hover:bg-opacity-90 transition-colors focus:outline-none disabled:opacity-50"
                             >
-                                {isSubmitting ? 'Adding...' : 'Add Connection'}
+                                {isSubmitting 
+                                    ? (editingConnection ? 'Saving...' : 'Adding...') 
+                                    : (editingConnection ? 'Save Connection' : 'Add Connection')}
                             </button>
                         </div>
                     </form>

@@ -56,7 +56,7 @@ class LLMService:
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
-    async def analyze_intent(self, messages: List[ChatMessage]) -> Dict[str, Any]:
+    async def analyze_intent(self, messages: List[ChatMessage], provider: str = "gemini", model: Optional[str] = None) -> Dict[str, Any]:
         """
         Analyzes the user's latest request to determine if it can be answered directly,
         needs clarification, or requires a database/tool query.
@@ -91,10 +91,35 @@ class LLMService:
         """
         
         try:
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            response = await model.generate_content_async(analysis_prompt)
+            if provider.lower() == "gemini":
+                model_obj = genai.GenerativeModel("gemini-1.5-flash")
+                response = await model_obj.generate_content_async(analysis_prompt, transport="rest")
+                raw_text = response.text
+            elif provider.lower() == "ollama":
+                raw_text = await self._generate_chat_with_ollama(
+                    system_prompt="You are a helpful intent classification assistant. Respond ONLY with a valid JSON block containing the intent classification.",
+                    messages=[ChatMessage(role="user", content=analysis_prompt)],
+                    model=model
+                )
+            elif provider.lower() == "chatgpt":
+                raw_text = await self._generate_chat_with_chatgpt(
+                    system_prompt="You are a helpful intent classification assistant. Respond ONLY with a valid JSON block containing the intent classification.",
+                    messages=[ChatMessage(role="user", content=analysis_prompt)],
+                    model=model
+                )
+            elif provider.lower() == "groq":
+                raw_text = await self._generate_chat_with_groq(
+                    system_prompt="You are a helpful intent classification assistant. Respond ONLY with a valid JSON block containing the intent classification.",
+                    messages=[ChatMessage(role="user", content=analysis_prompt)],
+                    model=model
+                )
+            else:
+                model_obj = genai.GenerativeModel("gemini-1.5-flash")
+                response = await model_obj.generate_content_async(analysis_prompt, transport="rest")
+                raw_text = response.text
+
             # Remove markdown formatting if present
-            clean_text = response.text.replace("```json", "").replace("```", "").strip()
+            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
             result = json.loads(clean_text)
             print(f"DEBUG: Intent Analysis Result: {result}")
             return result
@@ -435,6 +460,22 @@ class LLMService:
             Thought: Do I need to use a tool? No
             Final Answer: [your response here]
             """
+            
+            return f"""
+            You are a helpful Database Assistant. You have access to both database schemas and external tools.
+            Your task is to help the user by either calling tools, generating a query for the database, or answering directly.
+
+            {tools_instruction}
+
+            ### Database/Querying Instructions:
+            If you need to query the database, you can generate queries for the {engine.upper()} engine:
+            - For SQL databases (postgresql/mysql/sqlite): Output a query inside ```sql``` blocks. Only SELECT is allowed.
+            - For MongoDB: Output the query filter JSON inside ```json``` blocks.
+            - For Redis: Output the command inside ```redis``` blocks.
+
+            ### Database Schema:
+            {schema}
+            """
 
         if engine in ["postgresql", "mysql", "sqlite"]:
             return f"""
@@ -549,7 +590,7 @@ class LLMService:
         try:
             model_name = model or self.config["providers"]["gemini"]["model"]
             model = genai.GenerativeModel(model_name)
-            response = await model.generate_content_async(prompt)
+            response = await model.generate_content_async(prompt, transport="rest")
             raw_text = ""
             if response.candidates and response.candidates[0].content.parts:
                 raw_text = response.candidates[0].content.parts[0].text
@@ -766,7 +807,7 @@ class LLMService:
         try:
             model_name = model or self.config["providers"]["gemini"]["model"]
             genai_model = genai.GenerativeModel(model_name)
-            response = await genai_model.generate_content_async(prompt)
+            response = await genai_model.generate_content_async(prompt, transport="rest")
             if response.candidates and response.candidates[0].content.parts:
                 return response.candidates[0].content.parts[0].text
             else:

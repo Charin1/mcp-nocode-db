@@ -99,3 +99,47 @@ async def delete_mcp_connection(
     await db.delete(connection)
     await db.commit()
     return None
+
+@router.put("/{connection_id}", response_model=MCPConnectionOut)
+async def update_mcp_connection(
+    connection_id: int,
+    connection: MCPConnectionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update a specific MCP connection."""
+    result = await db.execute(
+        select(MCPConnection).where(
+            MCPConnection.id == connection_id,
+            MCPConnection.user_id == current_user.username
+        )
+    )
+    db_conn = result.scalar_one_or_none()
+    
+    if not db_conn:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="MCP connection not found"
+        )
+        
+    config = connection.configuration
+    if connection.connection_type == "sse" and connection.url and not config.get("url"):
+        config["url"] = connection.url
+
+    db_conn.name = connection.name
+    db_conn.connection_type = connection.connection_type
+    db_conn.url = connection.url
+    db_conn.configuration = config
+    db_conn.headers = connection.headers
+
+    try:
+        await db.commit()
+        await db.refresh(db_conn)
+        return db_conn
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update connection: {str(e)}"
+        )
+

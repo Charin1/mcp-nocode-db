@@ -211,13 +211,17 @@ async def send_message(
         )
 
         # 3. Analyze Intent
-        analysis = await llm_service.analyze_intent(messages=[ChatMessage(role="user", content=message.content)])
+        analysis = await llm_service.analyze_intent(
+            messages=[ChatMessage(role="user", content=message.content)],
+            provider=model_provider,
+            model=model
+        )
         intent = analysis.get("intent", "QUERY_REQUIRED")
         
         if intent == "ANSWER_DIRECTLY":
             # Generate a simple response without tools/ReAct
             response = await llm_service.generate_response_from_messages(
-                db_id=session.db_connection_id if session.db_connection_id else "default",
+                db_id=session.db_id if session.db_id else "default",
                 provider=model_provider,
                 model=model,
                 messages=[ChatMessage(role="user", content=message.content)],
@@ -246,11 +250,7 @@ async def send_message(
         tool_to_connection_map = {}
         active_connections = []
         
-        # Heuristic for MCP relevance (as a sub-check within QUERY_REQUIRED)
-        mcp_keywords = ["python", "calculate", "mean", "chart", "graph", "plot", "math", "script"]
-        mcp_needed = any(kw in message.content.lower() for kw in mcp_keywords)
-
-        if active_mcp_ids and mcp_needed:
+        if active_mcp_ids:
             # Parse IDs if they came as a single comma-separated string (frontend quirk handling)
             ids_to_fetch = []
             for id_val in active_mcp_ids:

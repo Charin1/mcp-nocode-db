@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDbStore } from 'stores/dbStore';
 import { useMcpStore } from 'stores/mcpStore';
-import { CubeIcon, TableCellsIcon, CircleStackIcon, MagnifyingGlassIcon, KeyIcon, PlusIcon, TrashIcon, LinkIcon } from '@heroicons/react/24/outline';
+import { CubeIcon, TableCellsIcon, CircleStackIcon, MagnifyingGlassIcon, KeyIcon, PlusIcon, TrashIcon, LinkIcon, PencilIcon } from '@heroicons/react/24/outline';
 import Spinner from 'components/common/Spinner';
 import MCPConnectionModal from 'components/mcp/MCPConnectionModal';
 
@@ -25,6 +25,7 @@ const Sidebar = () => {
   const { schema, isLoadingSchema, scope, globalSchema, selectedDbId, databases } = useDbStore();
   const { connections, fetchConnections, deleteConnection, isLoading, activeConnectionIds, toggleActiveConnection } = useMcpStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingConnection, setEditingConnection] = useState(null);
   const [expandedDbs, setExpandedDbs] = useState({});
   const [mcpSearch, setMcpSearch] = useState('');
 
@@ -180,17 +181,26 @@ const Sidebar = () => {
                       <LinkIcon className={`w-4 h-4 mr-2 flex-shrink-0 ${activeConnectionIds.includes(conn.id) ? 'text-accent-emerald' : 'text-brand-purple'}`} />
                       <span className={`truncate ${activeConnectionIds.includes(conn.id) ? 'text-[var(--text-primary)] font-medium' : ''}`} title={conn.url}>{conn.name}</span>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteConnection(conn.id); }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-red-400 rounded transition-opacity"
-                      title="Delete"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingConnection(conn); setIsModalOpen(true); }}
+                        className="p-1 text-[var(--text-muted)] hover:text-brand-indigo rounded"
+                        title="Edit"
+                      >
+                        <PencilIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteConnection(conn.id); }}
+                        className="p-1 text-[var(--text-muted)] hover:text-red-400 rounded"
+                        title="Delete"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </li>
                 ))}
                 
-                {connections.length > 0 && connections.filter(conn => conn.name.toLowerCase().includes(mcpSearch.toLowerCase())).length === 0 && (
+                {connections.length > 0 && connections.filter(conn => conn.name.toLowerCase().includes(mcpSearch.toLowerCase()) || (conn.url && conn.url.toLowerCase().includes(mcpSearch.toLowerCase()))).length === 0 && (
                    <li className="px-2 py-4 text-xs text-center text-[var(--text-muted)]">No matching connections.</li>
                 )}
 
@@ -205,7 +215,11 @@ const Sidebar = () => {
 
       <MCPConnectionModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingConnection(null);
+        }}
+        editingConnection={editingConnection}
       />
     </>
   );
